@@ -421,6 +421,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 <div class="modal" id="stM" role="dialog" aria-modal="true" aria-labelledby="stT"><div class="box wide">
   <h3 id="stT">Statement</h3>
   <pre class="rep" id="stText"></pre>
+  <div id="stPhBox" style="display:none;margin-bottom:10px"><label for="stPh" class="note">Supplier WhatsApp number (saved for next time)</label><input id="stPh" class="big-in" inputmode="tel" maxlength="16" placeholder="07…" autocomplete="off" style="font-size:17px"></div>
   <div class="act" style="padding:0;border:0;background:none">
     <a class="btn pay sm" id="stWa" target="_blank" rel="noopener" style="grid-column:1/-1;color:#fff;background:#1f8f4e">Send statement on WhatsApp</a>
     <button class="btn" id="stCopy">Copy</button>
@@ -860,7 +861,7 @@ $('custRows').onclick=e=>{
   if(d.pay){piC=custById(d.pay);const b=balance(piC.id);$('piT').textContent='Payment from '+piC.name;$('piInfo').textContent='Owes '+ksh(b);$('piAmt').value='';$('piCode').value='';
     $('piQuick').innerHTML=[...new Set([b,500,1000,2000,5000].filter(v=>v>0))].slice(0,5).map((v,i)=>`<button class="chip" data-a="${v}">${i==0&&v==b?'Full '+v.toLocaleString('en-KE'):v.toLocaleString('en-KE')}</button>`).join('');
     setPi('Cash');updPi();$('piM').classList.add('on');$('piAmt').focus()}
-  if(d.stmt){const c=custById(d.stmt);$('stT').textContent='Statement: '+c.name;$('stWa').textContent='Send statement on WhatsApp';const t=stmtText(c);$('stText').textContent=t;$('stWa').href=waTo(c.phone,'```\n'+t+'\n```');$('stM').classList.add('on')}
+  if(d.stmt){const c=custById(d.stmt);$('stPhBox').style.display='none';$('stT').textContent='Statement: '+c.name;$('stWa').textContent='Send statement on WhatsApp';const t=stmtText(c);$('stText').textContent=t;$('stWa').href=waTo(c.phone,'```\n'+t+'\n```');$('stM').classList.add('on')}
   if(d.cdel){const c=custById(d.cdel),b=balance(c.id);ask('Delete '+c.name+'?',b>0?`They still owe ${ksh(b)}. Their sales stay in your records.`:'Their sales stay in your records.','Delete',()=>{S.customers=S.customers.filter(x=>x!==c);logA('Customer deleted',c.name+(b>0?' (owed '+ksh(b)+')':''));save();renderCust()})}
 };
 $('piQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('piAmt').value=a;updPi()}};
@@ -871,7 +872,7 @@ $('piGo').onclick=()=>{const v=Math.round(parseFloat($('piAmt').value)||0);if(!(
   S.payments.push(x);logA('Payment received',piC.name+' '+ksh(v)+' '+piMethod);save();$('piM').classList.remove('on');renderCust();
   const c=piC,msg=`${S.name}: received ${ksh(v)} by ${piMethod} from ${c.name}. Balance now ${ksh(balance(c.id))}. Asante!`;
   toast(`${ksh(v)} saved. ${c.name} now owes ${ksh(balance(c.id))}`);
-  if(c.phone){$('stT').textContent='Payment saved';$('stText').textContent=msg;$('stWa').textContent='Send confirmation on WhatsApp';$('stWa').href=waTo(c.phone,msg);$('stM').classList.add('on')}
+  if(c.phone){$('stPhBox').style.display='none';$('stT').textContent='Payment saved';$('stText').textContent=msg;$('stWa').textContent='Send confirmation on WhatsApp';$('stWa').href=waTo(c.phone,msg);$('stM').classList.add('on')}
 };
 $('stNo').onclick=()=>$('stM').classList.remove('on');
 $('stCopy').onclick=()=>copy($('stText').textContent,'Statement copied');
@@ -1076,7 +1077,7 @@ function supList(){const m={};(S.stockIns||[]).filter(x=>x.from=='Credit').forEa
   return Object.values(m).map(r=>Object.assign(r,{owed:supOwed(r.name)})).sort((a,b)=>b.owed-a.owed)}
 function renderSup(){const L=supList(),tot=L.reduce((a,r)=>a+Math.max(0,r.owed),0);
   $('supTitle').textContent=tot?`Suppliers you owe (deni): ${ksh(tot)}`:'Suppliers you owe (deni)';
-  $('supRows').innerHTML=L.length?L.map(r=>`<tr><td><b>${esc(r.name||'Unnamed supplier')}</b></td><td class="n"><b style="color:${r.owed>0?'#c8102e':'inherit'}">${ksh(Math.max(0,r.owed))}</b></td><td>${r.lastPay?new Date(r.lastPay).toLocaleDateString('en-KE',{day:'numeric',month:'short'}):'—'}</td><td class="n" style="white-space:nowrap">${r.owed>0?`<button class="btn pay sm" style="min-height:36px;padding:4px 14px" data-supay="${esc(r.name)}">Pay</button>`:'<span class="tag">Paid up</span>'}</td></tr>`).join(''):'<tr><td colspan="4" class="note">No supplier deni. When meat comes on credit, choose <b>Paid from: Not paid yet</b> in Stock in.</td></tr>'}
+  $('supRows').innerHTML=L.length?L.map(r=>`<tr><td><b>${esc(r.name||'Unnamed supplier')}</b></td><td class="n"><b style="color:${r.owed>0?'#c8102e':'inherit'}">${ksh(Math.max(0,r.owed))}</b></td><td>${r.lastPay?new Date(r.lastPay).toLocaleDateString('en-KE',{day:'numeric',month:'short'}):'—'}</td><td class="n" style="white-space:nowrap">${r.owed>0?`<button class="btn pay sm" style="min-height:36px;padding:4px 14px" data-supay="${esc(r.name)}">Pay</button>`:'<span class="tag">Paid up</span>'} <button class="link" data-supst="${esc(r.name)}">Statement</button></td></tr>`).join(''):'<tr><td colspan="4" class="note">No supplier deni. When meat comes on credit, choose <b>Paid from: Not paid yet</b> in Stock in.</td></tr>'}
 let spyName='';
 function openSupPay(name){spyName=name;const owed=supOwed(name);$('spyT').textContent='Pay '+(name||'unnamed supplier');$('spyInfo').textContent='You owe '+ksh(owed);$('spyAmt').value='';$('spyNote').value='';$('spyFrom').value='Cash';
   $('spyQuick').innerHTML=[...new Set([owed,1000,5000,10000,20000].filter(v=>v>0&&v<=owed))].slice(0,5).map((v,i)=>`<button class="chip" data-a="${v}">${i==0?'Full '+v.toLocaleString('en-KE'):v.toLocaleString('en-KE')}</button>`).join('');updSpy();$('spyM').classList.add('on');$('spyAmt').focus()}
@@ -1087,6 +1088,21 @@ $('spyGo').onclick=()=>{const v=Math.round(parseFloat($('spyAmt').value)||0);if(
   S.supPays.push({id:'sp'+Date.now(),time:Date.now(),supplier:spyName,amount:v,from:$('spyFrom').value,note:$('spyNote').value.trim(),by:S.cashier});
   logA('Supplier paid',spyName+' '+ksh(v)+' ('+$('spyFrom').value+')');save();$('spyM').classList.remove('on');renderMenu();toast(`${ksh(v)} paid to ${spyName||'supplier'}. Still owe ${ksh(supOwed(spyName))}`)};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-supay]');if(b&&$('menu').contains(b))openSupPay(b.dataset.supay)});
+
+/* ---------- supplier statement ---------- */
+if(!S.supPhones)S.supPhones={};
+let stSup=null;
+function supStmtText(name){const k=supKey(name),w=34,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b;
+  const ev=[...(S.stockIns||[]).filter(x=>x.from=='Credit'&&supKey(x.supplier)==k).map(x=>({t:x.time,d:(x.name+' '+(x.unit=='kg'?kg(x.qty):x.qty+'pc')).slice(0,20),a:x.total})),
+            ...(S.supPays||[]).filter(x=>supKey(x.supplier)==k).map(x=>({t:x.time,d:'Paid '+x.from,a:-x.amount}))].sort((a,b)=>a.t-b.t);
+  const L=ev.map(e=>row(new Date(e.t).toLocaleDateString('en-KE',{day:'2-digit',month:'short'})+' '+e.d,(e.a<0?'-':'+')+Math.abs(e.a).toLocaleString('en-KE')));
+  return [(S.name||'').toUpperCase(),'SUPPLIER STATEMENT',name||'Unnamed supplier',new Date().toLocaleDateString('en-KE',{dateStyle:'medium'}),'='.repeat(w),...(L.length?L:['No entries yet']),'='.repeat(w),
+    row('Supplied on credit',ksh(ev.filter(e=>e.a>0).reduce((a,e)=>a+e.a,0))),row('Total paid',ksh(-ev.filter(e=>e.a<0).reduce((a,e)=>a+e.a,0))),row('BALANCE WE OWE',ksh(Math.max(0,supOwed(name)))),'','Asante!'].join('\n')}
+function updStWa(){if(stSup==null)return;const t=supStmtText(stSup);$('stWa').href=waTo($('stPh').value,'```\n'+t+'\n```')}
+function openSupStmt(name){stSup=name;$('stT').textContent='Supplier statement: '+(name||'Unnamed supplier');$('stText').textContent=supStmtText(name);
+  $('stPh').value=S.supPhones[supKey(name)]||'';$('stPhBox').style.display='';$('stWa').textContent='Send statement on WhatsApp';updStWa();$('stM').classList.add('on')}
+$('stPh').oninput=()=>{if(stSup==null)return;S.supPhones[supKey(stSup)]=$('stPh').value.trim();save();updStWa()};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-supst]');if(b&&$('menu').contains(b))openSupStmt(b.dataset.supst)});
 
 /* ---------- shell ---------- */
 function show(v){
