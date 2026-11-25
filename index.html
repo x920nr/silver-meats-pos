@@ -164,7 +164,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
       <button id="n-cust" data-v="cust">Customers</button>
       <button id="n-set" data-v="set">Settings</button>
     </nav>
-    <div class="who"><label for="cashier">Cashier</label><select id="cashier"></select><button class="btn" id="lockBtn" style="min-height:40px;padding:6px 12px;display:none" title="Switch back to a cashier">🔒 Lock</button><span class="clock" id="clock"></span></div>
+    <div class="who"><label for="cashier">Cashier</label><select id="cashier"></select><button class="btn" id="lockBtn" style="min-height:40px;padding:6px 12px;display:none" title="Switch back to a cashier">🔒 Lock</button><button class="btn" id="alertBtn" title="Alerts" style="min-height:40px;padding:6px 10px;position:relative">🔔<span id="alertN" style="display:none;position:absolute;top:-6px;right:-6px;background:#c8102e;color:#fff;border-radius:10px;font-size:12px;padding:0 6px;font-weight:800"></span></button><span class="clock" id="clock"></span></div>
   </header>
 
   <main id="reg" class="view on">
@@ -245,6 +245,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
         <label>VAT % on sales<input id="sTax" type="number" step="1" min="0" max="30"></label>
         <label>Receipt printer paper<select id="sPaper" style="width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:40px"><option value="80">80 mm roll (most receipt printers)</option><option value="58">58 mm roll (small printer)</option><option value="A4">A4 / normal printer</option></select></label>
         <label class="wide">Thank-you line<input id="sFoot" maxlength="60"></label>
+        <label class="wide">Email for reports (optional)<input id="sEmail" type="email" maxlength="80" placeholder="e.g. owner@gmail.com"></label>
       </div>
       <p class="note" style="margin-top:12px">Fresh, unprocessed meat is usually VAT-exempt in Kenya, so VAT starts at 0%. Check with KRA or your accountant.</p>
     </div>
@@ -257,6 +258,19 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
         <button class="btn pay sm" type="submit" style="min-width:9em">Add staff</button>
       </form>
       <label class="note" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px">Auto-lock after<select id="sLock" style="padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:15px"><option value="0">Never</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option></select>without use — switches back to a cashier so reports stay private.</label>
+    </div>
+    <div class="card">
+      <h3>Activity log</h3>
+      <p class="note">Every important action: who changed prices, deleted products, gave refunds or discounts, cleared a sale, received money, and who used the till. It cannot be edited.</p>
+      <div class="row" style="margin-bottom:10px"><input id="logQ" placeholder="Search e.g. Peter, refund, Beef" style="flex:1 1 220px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:44px"><button class="btn" id="logCopy">Copy log</button></div>
+      <div class="scroll" style="max-height:420px;overflow:auto"><table><thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody id="logRows"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>Customer privacy</h3>
+      <p class="note">The till keeps customer <b>names and phone numbers</b>. Show or send this notice to customers, and only save a phone number when the customer agrees.</p>
+      <pre class="rep" id="privText" style="white-space:pre-wrap"></pre>
+      <div class="row"><button class="btn" id="privCopy">Copy notice</button><label class="note" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sPrivRc" style="width:20px;height:20px"> Print a short privacy line on receipts</label></div>
+      <p class="note" style="margin-top:10px">Kenya's Data Protection Act applies to personal data. This notice is a simple starting point, not legal advice: ask the ODPC or a lawyer what your shop must do.</p>
     </div>
     <div class="card">
       <h3>Backup</h3>
@@ -290,7 +304,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 <div class="modal" id="payM" role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box">
   <h3 id="payT">Take payment</h3>
   <div class="due" id="due"></div>
-  <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="custName" class="big-in" maxlength="40" placeholder="e.g. John" autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label></div>
+  <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="custName" class="big-in" maxlength="40" placeholder="e.g. John" autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label><p class="note" style="grid-column:1/-1;margin:0;font-size:13px">Only save a phone number if the customer agrees.</p></div>
   <div class="tabs" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="chip" id="mCash" aria-pressed="true">Cash</button><button class="chip" id="mMp" aria-pressed="false">M-Pesa</button><button class="chip" id="mCr" aria-pressed="false">Credit</button></div>
   <div id="cashBox">
     <label for="tend" class="note">Cash received (KSh)</label>
@@ -337,6 +351,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   <div class="act" style="padding:0;border:0;background:none">
     <button class="btn" id="zCopy">Copy report</button>
     <a class="btn" id="zWa" target="_blank" rel="noopener">Send on WhatsApp</a>
+    <a class="btn" id="zMail">Send by email</a>
     <button class="btn" id="zBack">Back</button>
     <button class="btn pay sm" id="zClose">Close the day</button>
   </div>
@@ -440,6 +455,13 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   </div>
 </div></div>
 
+<div class="modal" id="alM" role="dialog" aria-modal="true" aria-labelledby="alT"><div class="box wide">
+  <h3 id="alT">Good morning</h3>
+  <p class="note" id="alDate" style="margin:0 0 10px"></p>
+  <div id="alBody"></div>
+  <div class="act" style="padding:12px 0 0;border:0;background:none"><button class="btn pay sm" style="grid-column:1/-1" id="alOk">OK</button></div>
+</div></div>
+
 <div class="toast" id="toast"><span id="toastT"></span><button id="toastU">Undo</button></div>
 
 <script>
@@ -480,7 +502,8 @@ if(!S.v7){ /* upgrade: remove the demo sales and demo till number from the first
   Object.assign(S,{loc:S.loc||'',phone:S.phone||'',pin:S.pin||'',footer:S.footer||'Asante! Karibu tena.',staff:S.staff||['Owner'],closes:S.closes||{},v7:1});
   S.cashier=S.cashier||S.staff[0];
 }
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(typeof scheduleCloud=='function')scheduleCloud()};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(typeof scheduleCloud=='function')scheduleCloud();try{renderAlertBadge()}catch(e){}};
+function logA(a,d){if(!S.log)S.log=[];S.log.push({t:Date.now(),by:S.cashier||'',a,d:d||''});if(S.log.length>3000)S.log.splice(0,S.log.length-3000)}
 if(!S.phone)S.phone='0794 506 667';
 if(S.hours==null)S.hours='Open 6:00 AM – 4:00 PM';
 if(!S.v8){[['goat','Goat meat','Goat',750],['camel','Camel meat','Camel',700],['fish','Fish','Fish',900]].forEach(([id,name,cat,price])=>{if(!S.products.some(p=>p.name.toLowerCase()==name.toLowerCase()))S.products.push({id,name,cat,unit:'kg',price,stock:null})});S.v8=1}
@@ -491,7 +514,7 @@ save();
 let cat='All',q='',method='Cash',undo=null,lastOrder=null,tt,wItem=null,wMode='kg',wEdit=-1,selDay=dk(Date.now()),cfFn=null,per='day';
 const prod=id=>S.products.find(p=>p.id==id);
 if(!S.mode)S.mode='retail';
-if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
+if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
 const wp=p=>S.mode=='wholesale'&&p.wprice?p.wprice:p.price;
 const inCart=id=>S.cart.filter(l=>l.id==id).reduce((s,l)=>s+l.qty,0);
 function sums(items,disc,tax){
@@ -595,7 +618,7 @@ $('ticket').onclick=e=>{
   else return;
   save();renderReg();
 };
-$('clear').onclick=()=>{const c=S.cart,d=S.disc;S.cart=[];S.disc=0;save();renderReg();toast('Sale cleared',()=>{S.cart=c;S.disc=d;save();renderReg()})};
+$('clear').onclick=()=>{const c=S.cart,d=S.disc;if(c.length)logA('Sale cleared',c.map(l=>l.name).join(', ')+' = '+ksh(sums(c,d,S.tax).total));S.cart=[];S.disc=0;save();renderReg();toast('Sale cleared',()=>{S.cart=c;S.disc=d;save();renderReg()})};
 $('hold').onclick=()=>{S.held.push({no:S.next++,cart:S.cart,disc:S.disc,mode:S.mode});S.cart=[];S.disc=0;save();renderReg();toast('Sale held')};
 $('held').onclick=e=>{const i=e.target.dataset.recall;if(i==null)return;
   if(S.cart.length)S.held.push({no:S.next++,cart:S.cart,disc:S.disc,mode:S.mode});
@@ -628,7 +651,7 @@ $('payDone').onclick=()=>{
   if(method=='Cash'){o.tendered=parseFloat($('tend').value)||o.total;o.change=o.tendered-o.total}
   else if(method=='M-Pesa')o.code=$('mpCode').value.trim().toUpperCase();
   else{o.custId=cr.id;o.customer=cr.name}
-  moveStock(o,-1);S.orders.push(o);S.cart=[];S.disc=0;save();
+  moveStock(o,-1);S.orders.push(o);if(o.disc)logA('Discount given','Receipt #'+o.no+' '+o.discPct+'% = '+ksh(o.disc));S.cart=[];S.disc=0;save();
   $('payM').classList.remove('on');openReceipt(o);renderReg();
 };
 function head(){return [S.loc,S.phone?'Tel '+S.phone:'',S.hours||'',S.pin?'KRA PIN '+S.pin.toUpperCase():''].filter(Boolean)}
@@ -638,14 +661,14 @@ function receiptText(o){
     ...o.items.flatMap(l=>[l.name.slice(0,w),row('  '+qtyTxt(l)+' x '+l.price,ksh(l.amt))]),'-'.repeat(w),row('Subtotal',ksh(o.sub)),
     ...(o.disc?[row('Discount '+o.discPct+'%','-'+ksh(o.disc))]:[]),...(o.tax?[row('VAT '+o.taxPct+'%',ksh(o.tax))]:[]),row('TOTAL',ksh(o.total)),
     ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:[row('Paid '+o.method,ksh(o.tendered||o.total))]),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
-    ...(S.till?wrapT(mpLine(),w).map(c):[]),'',o.status=='Refunded'?c('*** REFUNDED ***'):c(S.footer||'')].join('\n');
+    ...(S.till?wrapT(mpLine(),w).map(c):[]),'',o.status=='Refunded'?c('*** REFUNDED ***'):c(S.footer||''),...(S.privRc?wrapT('Your details are used only for receipts and credit. Ask us to delete them.',w).map(c):[])].join('\n');
 }
 function openReceipt(o){
   lastOrder=o;
   $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(S.name)}</h2>${head().map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
     linesHTML(o.items,false)+totHTML({sub:o.sub,d:o.disc,pct:o.discPct,t:o.tax,tp:o.taxPct,total:o.total})+
     `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
-    `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>`;
+    `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>${S.privRc?'<p class="hd" style="margin-top:6px;font-size:11px">Your details are used only for receipts and credit. Ask us to delete them.</p>':''}`;
   $('rcPhone').value=o.custPhone||'';$('rcName').value=o.customer||'';$('rcName').disabled=o.method=='Credit';updWa();
   $('rcM').classList.add('on');
 }
@@ -739,21 +762,21 @@ function zText(day){
     cl?'Closed by '+cl.by+' at '+hm(cl.at):'Printed '+new Date().toLocaleString('en-KE')].join('\n');
 }
 function openZ(){
-  $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));
+  $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));$('zMail').href=mailHref((S.name||'Shop')+' — '+(per=='day'?'End of day':per=='week'?'Week':'Month')+' report — '+report(selDay).RG.label,zText(selDay));
   $('zClose').style.display=per!='day'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
 }
 $('closeDay').onclick=openZ;
 $('zBack').onclick=()=>$('zM').classList.remove('on');
 $('zCopy').onclick=()=>copy(zText(selDay),'Report copied');
-$('zClose').onclick=()=>{S.closes[selDay]={at:Date.now(),by:S.cashier};save();openZ();renderOrders();toast('Day closed')};
+$('zClose').onclick=()=>{S.closes[selDay]={at:Date.now(),by:S.cashier};logA('Day closed',selDay);save();openZ();renderOrders();toast('Day closed')};
 $('day').onchange=e=>{if(e.target.value){selDay=e.target.value;renderOrders()}};
 $('dayToday').onclick=()=>{selDay=dk(Date.now());renderOrders()};
 $('ordWrap').onclick=e=>{
   const d0=e.target.dataset;if(d0.goday){selDay=d0.goday;per='day';renderOrders();return}
-  if(d0.exdel){const x=S.expenses.find(y=>y.id==d0.exdel);if(x)ask('Delete this expense?',x.cat+' '+ksh(x.amount),'Delete',()=>{S.expenses=S.expenses.filter(y=>y!==x);save();renderOrders()});return}
+  if(d0.exdel){const x=S.expenses.find(y=>y.id==d0.exdel);if(x)ask('Delete this expense?',x.cat+' '+ksh(x.amount),'Delete',()=>{S.expenses=S.expenses.filter(y=>y!==x);logA('Expense deleted',x.cat+' '+ksh(x.amount));save();renderOrders()});return}
   const d=e.target.dataset,o=S.orders.find(x=>x.no==(d.view||d.refund));if(!o)return;
   if(d.view)openReceipt(o);
-  if(d.refund)ask('Refund receipt #'+o.no+'?',`${ksh(o.total)} paid by ${o.method}. Give the money back to the customer. Stock will be added back.`,'Refund',()=>{o.status='Refunded';o.refundedBy=S.cashier;moveStock(o,1);save();renderOrders();toast('Receipt #'+o.no+' refunded')});
+  if(d.refund)ask('Refund receipt #'+o.no+'?',`${ksh(o.total)} paid by ${o.method}. Give the money back to the customer. Stock will be added back.`,'Refund',()=>{o.status='Refunded';o.refundedBy=S.cashier;moveStock(o,1);logA('Refund','Receipt #'+o.no+' '+ksh(o.total)+' ('+o.method+')');save();renderOrders();toast('Receipt #'+o.no+' refunded')});
 };
 
 
@@ -796,14 +819,14 @@ $('custRows').onclick=e=>{
     $('piQuick').innerHTML=[...new Set([b,500,1000,2000,5000].filter(v=>v>0))].slice(0,5).map((v,i)=>`<button class="chip" data-a="${v}">${i==0&&v==b?'Full '+v.toLocaleString('en-KE'):v.toLocaleString('en-KE')}</button>`).join('');
     setPi('Cash');updPi();$('piM').classList.add('on');$('piAmt').focus()}
   if(d.stmt){const c=custById(d.stmt);$('stT').textContent='Statement: '+c.name;$('stWa').textContent='Send statement on WhatsApp';const t=stmtText(c);$('stText').textContent=t;$('stWa').href=waTo(c.phone,'```\n'+t+'\n```');$('stM').classList.add('on')}
-  if(d.cdel){const c=custById(d.cdel),b=balance(c.id);ask('Delete '+c.name+'?',b>0?`They still owe ${ksh(b)}. Their sales stay in your records.`:'Their sales stay in your records.','Delete',()=>{S.customers=S.customers.filter(x=>x!==c);save();renderCust()})}
+  if(d.cdel){const c=custById(d.cdel),b=balance(c.id);ask('Delete '+c.name+'?',b>0?`They still owe ${ksh(b)}. Their sales stay in your records.`:'Their sales stay in your records.','Delete',()=>{S.customers=S.customers.filter(x=>x!==c);logA('Customer deleted',c.name+(b>0?' (owed '+ksh(b)+')':''));save();renderCust()})}
 };
 $('piQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('piAmt').value=a;updPi()}};
 $('piAmt').oninput=updPi;$('piCash').onclick=()=>setPi('Cash');$('piMp').onclick=()=>setPi('M-Pesa');
 $('piNo').onclick=()=>$('piM').classList.remove('on');
 $('piGo').onclick=()=>{const v=Math.round(parseFloat($('piAmt').value)||0);if(!(v>0))return;
   const x={id:'y'+Date.now(),custId:piC.id,amount:v,method:piMethod,time:Date.now(),by:S.cashier};if(piMethod=='M-Pesa'){const c=$('piCode').value.trim().toUpperCase();if(c)x.code=c}
-  S.payments.push(x);save();$('piM').classList.remove('on');renderCust();
+  S.payments.push(x);logA('Payment received',piC.name+' '+ksh(v)+' '+piMethod);save();$('piM').classList.remove('on');renderCust();
   const c=piC,msg=`${S.name}: received ${ksh(v)} by ${piMethod} from ${c.name}. Balance now ${ksh(balance(c.id))}. Asante!`;
   toast(`${ksh(v)} saved. ${c.name} now owes ${ksh(balance(c.id))}`);
   if(c.phone){$('stT').textContent='Payment saved';$('stText').textContent=msg;$('stWa').textContent='Send confirmation on WhatsApp';$('stWa').href=waTo(c.phone,msg);$('stM').classList.add('on')}
@@ -828,17 +851,19 @@ $('menuRows').oninput=e=>{
   else p[f]=e.target.value;
   save();
 };
+$('menuRows').addEventListener('focusin',e=>{if(e.target.dataset.f)e.target.dataset.old=e.target.value});
+$('menuRows').addEventListener('change',e=>{const f=e.target.dataset.f;if(!f)return;const tr=e.target.closest('tr'),p=tr&&prod(tr.dataset.id);if(!p)return;const old=e.target.dataset.old??'',nv=e.target.value;if(old===nv)return;const L={name:'name',price:'retail price',wprice:'wholesale price',cost:'buying price',stock:'stock',cat:'category',unit:'sold by'};logA('Product changed',p.name+': '+L[f]+' '+(old||'—')+' → '+(nv||'—'));save();e.target.dataset.old=nv});
 $('menuRows').onclick=e=>{if(e.target.dataset.si){openSi(e.target.dataset.si);return}const id=e.target.dataset.del;if(!id)return;const p=prod(id);
-  ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
+  ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);logA('Product deleted',p.name);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
 $('addForm').onsubmit=e=>{e.preventDefault();
   const name=$('aName').value.trim(),price=parseFloat($('aPrice').value),st=$('aStock').value,wv=parseFloat($('aWprice').value),cv=parseFloat($('aCost').value);if(!name||isNaN(price))return;
   S.products.push({id:'p'+Date.now(),name,cat:$('aCat').value,unit:$('aUnit').value,price:Math.round(price),wprice:wv>0?Math.round(wv):null,cost:cv>=0?Math.round(cv):null,stock:st===''?null:r3(+st)});save();renderMenu();
-  e.target.reset();$('aName').focus();toast(name+' added')};
+  logA('Product added',name+' '+ksh(price));save();e.target.reset();$('aName').focus();toast(name+' added')};
 
 /* ---------- settings ---------- */
 const SF={sName:'name',sLoc:'loc',sPhone:'phone',sHours:'hours',sPin:'pin',sTill:'till',sFoot:'footer'};
 function renderSet(){
-  Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);renderStaff();renderCloud();
+  Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);$('sEmail').value=S.email||'';renderStaff();renderCloud();renderLog();renderPriv();
   $('bkInfo').textContent=`${S.orders.length} receipt${S.orders.length==1?'':'s'} and ${S.products.length} products on this device.`;
 }
 Object.entries(SF).forEach(([id,k])=>$(id).oninput=e=>{S[k]=e.target.value;save();renderHead()});
@@ -855,14 +880,14 @@ function renderStaff(){
 }
 $('staffList').onchange=e=>{const i=e.target.dataset.role;if(i==null)return;const n=S.staff[i],r=e.target.value;
   if(role(n)=='Owner'&&r!='Owner'&&S.staff.filter(x=>role(x)=='Owner').length==1){toast('There must be at least one Owner');renderStaff();return}
-  S.roles[n]=r;if(r=='Cashier')delete S.pins[n];save();renderStaff();applyAccess();toast(n+' is now '+r)};
+  S.roles[n]=r;if(r=='Cashier')delete S.pins[n];logA('Role changed',n+' → '+r);save();renderStaff();applyAccess();toast(n+' is now '+r)};
 $('staffForm').onsubmit=e=>{e.preventDefault();const n=$('sNew').value.trim();if(!n)return;if(S.staff.some(x=>x.toLowerCase()==n.toLowerCase())){toast(n+' is already on the list');return}
-  S.staff.push(n);S.roles[n]='Cashier';save();$('sNew').value='';renderHead();renderStaff();toast(n+' added. Pick them under Cashier at the top.')};
+  S.staff.push(n);S.roles[n]='Cashier';logA('Staff added',n);save();$('sNew').value='';renderHead();renderStaff();toast(n+' added. Pick them under Cashier at the top.')};
 $('staffList').onclick=e=>{const d=e.target.dataset;
-  if(d.pin!=null){const n=S.staff[d.pin];pinAsk('PIN for '+n,'Type a new 4–6 number PIN for '+n+'. Keep it secret.',async v=>{S.pins[n]=await hashPin(v);save();renderStaff();toast('PIN saved for '+n);return true});return}
+  if(d.pin!=null){const n=S.staff[d.pin];pinAsk('PIN for '+n,'Type a new 4–6 number PIN for '+n+'. Keep it secret.',async v=>{S.pins[n]=await hashPin(v);logA('PIN set',n);save();renderStaff();toast('PIN saved for '+n);return true});return}
   const i=d.rmstaff;if(i==null)return;const n=S.staff[i];
   if(role(n)=='Owner'&&S.staff.filter(x=>role(x)=='Owner').length==1){toast('There must be at least one Owner');return}
-  ask('Remove '+n+'?','Their past sales stay in your records.','Remove',()=>{S.staff.splice(i,1);delete S.roles[n];delete S.pins[n];if(!S.staff.includes(S.cashier))S.cashier=S.staff[0];save();renderHead();renderStaff();applyAccess()})};
+  ask('Remove '+n+'?','Their past sales stay in your records.','Remove',()=>{S.staff.splice(i,1);delete S.roles[n];delete S.pins[n];logA('Staff removed',n);if(!S.staff.includes(S.cashier))S.cashier=S.staff[0];save();renderHead();renderStaff();applyAccess()})};
 $('bkCopy').onclick=()=>copy('SILVERPOS1:'+JSON.stringify(S),'Backup copied. Paste it into WhatsApp or email to keep it safe.');
 $('bkOpen').onclick=()=>{$('bkIn').value='';$('bkErr').textContent='';$('bkM').classList.add('on');$('bkIn').focus()};
 $('bkNo').onclick=()=>$('bkM').classList.remove('on');
@@ -870,9 +895,9 @@ $('bkGo').onclick=()=>{
   let d;try{d=JSON.parse($('bkIn').value.trim().replace(/^SILVERPOS1:/,''))}catch(e){}
   if(!d||!Array.isArray(d.products)||!Array.isArray(d.orders)){$('bkErr').textContent='That is not a valid backup. Copy the whole text and try again.';return}
   $('bkM').classList.remove('on');
-  ask('Replace everything on this device?',`The backup has ${d.orders.length} receipts and ${d.products.length} products.`,'Restore',()=>{S=d;S.v7=1;save();renderHead();renderSet();toast('Backup restored')});
+  ask('Replace everything on this device?',`The backup has ${d.orders.length} receipts and ${d.products.length} products.`,'Restore',()=>{S=d;S.v7=1;logA('Backup restored','from pasted backup');save();renderHead();renderSet();toast('Backup restored')});
 };
-$('wipe').onclick=()=>ask('Delete all sales?',`${S.orders.length} receipts will be removed from this device. This cannot be undone.`,'Delete all',()=>{S.orders=[];S.held=[];S.cart=[];S.closes={};S.payments=[];save();renderSet();toast('All sales deleted')});
+$('wipe').onclick=()=>ask('Delete all sales?',`${S.orders.length} receipts will be removed from this device. This cannot be undone.`,'Delete all',()=>{logA('ALL SALES DELETED',S.orders.length+' receipts');S.orders=[];S.held=[];S.cart=[];S.closes={};S.payments=[];save();renderSet();toast('All sales deleted')});
 
 
 /* ---------- roles & PIN ---------- */
@@ -894,7 +919,7 @@ function applyAccess(){
   $('lockBtn').style.display=boss()&&S.staff.some(n=>role(n)=='Cashier')?'':'none';
   if(!boss()&&RESTRICTED.some(v=>$(v).classList.contains('on')))show('reg');
 }
-function switchTo(n){S.cashier=n;save();renderHead();applyAccess();if($('reg').classList.contains('on'))renderTicket();if($('set').classList.contains('on'))renderSet()}
+function switchTo(n){const prev=S.cashier;S.cashier=n;if(prev!==n)logA('Till user changed',(prev||'—')+' → '+n);save();renderHead();applyAccess();if($('reg').classList.contains('on'))renderTicket();if($('set').classList.contains('on'))renderSet()}
 $('cashier').onchange=e=>{const n=e.target.value,prev=S.cashier;
   if(role(n)!='Cashier'&&S.pins[n]){$('cashier').value=prev;pinAsk(n+' ('+role(n)+')','Enter PIN to switch to '+n+'.',async v=>{if(await hashPin(v)!==S.pins[n])return false;switchTo(n);toast('Now selling as '+n);return true})}
   else switchTo(n)};
@@ -908,7 +933,7 @@ $('addExp').onclick=()=>{$('exAmt').value='';$('exNote').value='';$('exDate').va
 $('exNo').onclick=()=>$('exM').classList.remove('on');
 $('exGo').onclick=()=>{const v=Math.round(parseFloat($('exAmt').value)||0);if(!(v>0)){toast('Type the amount');return}
   const d=$('exDate').value||dk(Date.now()),t=d==dk(Date.now())?Date.now():+new Date(d+'T12:00');
-  S.expenses.push({id:'e'+Date.now(),time:t,cat:$('exCat').value,amount:v,from:$('exFrom').value,note:$('exNote').value.trim(),by:S.cashier});save();$('exM').classList.remove('on');renderOrders();toast('Expense saved: '+ksh(v))};
+  S.expenses.push({id:'e'+Date.now(),time:t,cat:$('exCat').value,amount:v,from:$('exFrom').value,note:$('exNote').value.trim(),by:S.cashier});logA('Expense added',$('exCat').value+' '+ksh(v));save();$('exM').classList.remove('on');renderOrders();toast('Expense saved: '+ksh(v))};
 $('perBar').onclick=e=>{const p=e.target.dataset.per;if(p){per=p;renderOrders()}};
 
 /* ---------- stock in ---------- */
@@ -922,10 +947,10 @@ $('openSi').onclick=()=>openSi();
 $('siNo').onclick=()=>$('siM').classList.remove('on');
 $('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty').value)||0),c=Math.round(parseFloat($('siCost').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}
   S.stockIns.push({id:'s'+Date.now(),time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:q,cost:c,total:Math.round(q*c),supplier:$('siSup').value.trim(),from:$('siFrom').value,by:S.cashier});
-  p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;save();$('siM').classList.remove('on');renderMenu();
+  p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;logA('Stock in',p.name+' +'+(p.unit=='kg'?kg(q):q+' pc')+' @ '+ksh(c));save();$('siM').classList.remove('on');renderMenu();
   toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
 $('siRows').onclick=e=>{const id=e.target.dataset.sidel;if(!id)return;const x=S.stockIns.find(y=>y.id==id);if(!x)return;
-  ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);save();renderMenu()})};
+  ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);logA('Stock in undone',x.name+' '+(x.unit=='kg'?kg(x.qty):x.qty+' pc'));save();renderMenu()})};
 
 /* ---------- auto-lock ---------- */
 var lastAct=Date.now();['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},true));
@@ -949,10 +974,49 @@ async function cloudLoad(){if(!DB||!UID)return;
   try{const col=DB.collection('data/users/'+UID),m=await col.doc('pos_meta').get();if(!m.exists){toast('No cloud backup for your account yet');return}
     const md=m.data();let j='';for(let i=0;i<md.parts;i++){const d=await col.doc('pos_part_'+i).get();j+=d.exists?(d.data().s||''):''}
     const d=JSON.parse(j);if(!d||!Array.isArray(d.products)){toast('Cloud backup is damaged');return}
-    ask('Replace everything on this device?',`Cloud backup from ${new Date(md.at).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})} with ${md.receipts} receipts.`,'Restore',()=>{S=d;S.v7=1;S.cloudAt=md.at;save();renderHead();applyAccess();renderSet();toast('Restored from cloud')})}
+    ask('Replace everything on this device?',`Cloud backup from ${new Date(md.at).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})} with ${md.receipts} receipts.`,'Restore',()=>{S=d;S.v7=1;S.cloudAt=md.at;logA('Backup restored','from cloud');save();renderHead();applyAccess();renderSet();toast('Restored from cloud')})}
   catch(e){toast('Could not read the cloud backup: '+((e&&e.message)||(e&&e.code)||e))}}
 $('cloudSave').onclick=()=>cloudSave(true);$('cloudLoad').onclick=cloudLoad;
 (async()=>{try{if(window.claude&&window.claude.use){const u=await window.claude.use('user');const db=await window.claude.use('db');if(u&&db){const id=await u.id();if(id){DB=db;UID=id}}}}catch(e){}renderCloud();if(DB&&UID)scheduleCloud()})();
+
+
+/* ---------- activity log view ---------- */
+function renderLog(){const q=($('logQ').value||'').trim().toLowerCase();const L=(S.log||[]).slice().reverse().filter(x=>!q||(x.by+' '+x.a+' '+x.d).toLowerCase().includes(q)).slice(0,300);
+  $('logRows').innerHTML=L.length?L.map(x=>`<tr${/DELETED|Refund|cleared|Discount/.test(x.a)?' style="background:#fdecee"':''}><td style="white-space:nowrap">${new Date(x.t).toLocaleString('en-KE',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</td><td>${esc(x.by)}</td><td><b>${esc(x.a)}</b> ${esc(x.d)}</td></tr>`).join(''):'<tr><td colspan="3" class="note">Nothing recorded yet.</td></tr>'}
+$('logQ').oninput=renderLog;
+$('logCopy').onclick=()=>copy((S.log||[]).map(x=>new Date(x.t).toLocaleString('en-KE')+' | '+x.by+' | '+x.a+' '+x.d).join('\n'),'Activity log copied');
+
+/* ---------- privacy notice ---------- */
+const privNotice=()=>`${S.name||'Our shop'} keeps your name and phone number only to make your receipts, send them to you on WhatsApp, and keep track of credit (deni) you owe. We do not sell or share them. They are stored on our shop's own devices. Ask us any time to see, correct or delete your details.${S.phone?' Call '+S.phone+'.':''}`;
+function renderPriv(){$('privText').textContent=privNotice();$('sPrivRc').checked=!!S.privRc}
+$('privCopy').onclick=()=>copy(privNotice(),'Privacy notice copied');
+$('sPrivRc').onchange=e=>{S.privRc=e.target.checked;save()};
+$('sEmail').oninput=e=>{S.email=e.target.value.trim();save()};
+
+/* ---------- email report ---------- */
+function mailHref(subject,body){return 'mailto:'+encodeURIComponent(S.email||'')+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body.length>1800?body.slice(0,1800)+'\n…(copy the full report from the till)':body)}
+
+/* ---------- morning alert ---------- */
+function alertItems(){
+  const low=S.products.filter(p=>tracked(p)&&p.stock<=(p.unit=='kg'?3:2)).map(p=>({t:'low',p}));
+  const od=(S.customers||[]).filter(c=>overdue(c.id)).map(c=>({t:'od',c}));
+  const unpaid=(S.stockIns||[]).filter(x=>x.from=='Credit').map(x=>({t:'sup',x}));
+  return {low,od,unpaid,n:low.length+od.length+unpaid.length};
+}
+function renderAlertBadge(){const A=alertItems();$('alertN').textContent=A.n;$('alertN').style.display=A.n?'':'none'}
+function openAlerts(){const A=alertItems(),h=new Date().getHours();
+  $('alT').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening')+(S.cashier?', '+S.cashier:'');
+  $('alDate').textContent=new Date().toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long'});
+  const sec=(title,rows)=>rows.length?`<h4 style="margin:12px 0 6px">${title}</h4><div style="display:grid;gap:6px">${rows.join('')}</div>`:'';
+  const row=(a,b,red)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;background:${red?'#fdecee':'var(--soft)'}"><span>${a}</span><b style="white-space:nowrap">${b}</b></div>`;
+  $('alBody').innerHTML=A.n?
+    sec('⚠️ Low stock — order more',A.low.map(({p})=>row(esc(p.name),p.stock<=0?'OUT':(p.unit=='kg'?kg(p.stock):p.stock+' pc')+' left',p.stock<=0)))+
+    sec('💰 Customers overdue (no payment 7+ days)',A.od.map(({c})=>row(esc(c.name)+(c.phone?' · '+esc(c.phone):''),ksh(balance(c.id)),true)))+
+    sec('🚚 Suppliers not paid yet',A.unpaid.map(({x})=>row(esc(x.name)+' · '+esc(x.supplier||'supplier')+' · '+new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'}),ksh(x.total))))
+    :'<p style="font-size:18px">✅ All good: no low stock, no overdue customers, no unpaid suppliers.</p>';
+  $('alM').classList.add('on')}
+$('alertBtn').onclick=openAlerts;
+$('alOk').onclick=()=>$('alM').classList.remove('on');
 
 /* ---------- shell ---------- */
 function show(v){
@@ -964,13 +1028,15 @@ function show(v){
 document.querySelector('nav').onclick=e=>{const v=e.target.dataset.v;if(v)show(v)};
 $('toastU').onclick=()=>{if(undo)undo();undo=null;$('toast').classList.remove('on')};
 document.addEventListener('keydown',e=>{
-  if(e.key=='Escape')['wM','payM','rcM','zM','bkM','cfM','picM','piM','stM','pinM','exM','siM'].forEach(id=>$(id).classList.remove('on'));
+  if(e.key=='Escape')['wM','payM','rcM','zM','bkM','cfM','picM','piM','stM','pinM','exM','siM','alM'].forEach(id=>$(id).classList.remove('on'));
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&$('reg').classList.contains('on')){e.preventDefault();$('q').focus()}
 });
 const tick=()=>$('clock').textContent=new Date().toLocaleString('en-KE',{weekday:'short',hour:'numeric',minute:'2-digit'});
 tick();setInterval(tick,15000);
 if(boss()&&S.pins[S.cashier]){const c=S.staff.find(n=>role(n)=='Cashier');if(c){S.cashier=c;save()}}
 renderHead();applyAccess();renderReg();
+renderAlertBadge();setInterval(renderAlertBadge,60000);
+if(S.alertDay!==dk(Date.now())){S.alertDay=dk(Date.now());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};setTimeout(openAlerts,400)}
 }
 </script>
 <script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}</script>
