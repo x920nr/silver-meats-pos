@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Silver Meats 2 POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE a professional shop till for a Kenyan butchery: calm, exact, fast at the counter
+   IDEA the butcher's scale and till: meat keys on the left, a printed receipt slip on the right
+   PICTURE the live register: keys by cut, scale dialog for kg or shillings, a real receipt with shop details
+   COLOUR from the Silver Meats rooster logo: red, white and black only; beef keys red, chicken keys white, red pay key
+   TYPE Anton for the name and big figures (like the logo), Montserrat body, Plex Mono on receipts
+   LAYOUT laptop: keys grid | 390px slip; phone: keys then slip, sticky charge bar */
+:root,:root[data-theme]{color-scheme:light;--bg:#f7f7f7;--ink:#111111;--soft:#efefef;--line:#dddddd;--mute:#555555;--band:#111111;--brown:#111111;--sky:#ffffff;--acc:#c8102e;--paper:#ffffff;--red:#c8102e}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.5 Montserrat,system-ui,sans-serif;overflow-x:clip}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid #6fb7c9;outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+header{background:var(--band);color:var(--brown);border-bottom:2px solid var(--brown);display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:8px max(2vw,16px)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:64px;height:64px;display:block;object-fit:contain}
+header h1{font:400 26px/1 Anton,Impact,sans-serif;margin:0;letter-spacing:.02em;text-transform:uppercase}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{color:var(--brown);padding:10px 13px;border-radius:10px;min-height:44px;font-weight:600}
+nav button[aria-current=true]{background:var(--brown);color:var(--band)}
+.who{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--mute);font-size:14px}
+.who select{background:#fff;border:1.5px solid var(--brown);color:var(--brown);border-radius:10px;padding:8px 10px;min-height:44px;font-weight:600}
+.clock{font:600 14px 'IBM Plex Mono',monospace;white-space:nowrap;color:var(--brown)}
+.view{display:none;overflow:auto}
+.view.on{display:block}
+#reg.on{display:grid;grid-template-columns:minmax(0,1fr) 390px;overflow:hidden}
+.keys{overflow:auto;padding:16px max(2vw,16px) 24px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.bar input{flex:1 1 200px;font-size:16px;padding:10px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);min-height:44px}
+.chip{padding:9px 14px;border-radius:999px;background:var(--soft);font-weight:600;min-height:44px;white-space:nowrap}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.key{position:relative;text-align:left;border-radius:14px;padding:14px;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;gap:6px;box-shadow:inset 0 -4px 0 rgb(0 0 0/.2);transition:transform .08s}
+.key:active{transform:translateY(2px);box-shadow:inset 0 -1px 0 rgb(0 0 0/.2)}
+.key b{font-weight:700;font-size:16px;line-height:1.15;padding-right:28px}
+.key span{font-weight:700;font-size:15px}
+.key small{font-size:13px;opacity:.85}
+.key small.low{opacity:1;background:#fff;color:var(--red);border-radius:6px;padding:0 6px;width:max-content;font-weight:700}
+.key i{position:absolute;top:8px;right:8px;font-style:normal;background:#fff;color:var(--brown);border:1.5px solid var(--brown);font-weight:800;font-size:13px;min-width:26px;height:26px;border-radius:13px;display:grid;place-items:center;padding:0 6px}
+.c-Beef{background:var(--brown);color:#fff}.c-Chicken{background:var(--sky);color:var(--brown);box-shadow:inset 0 0 0 1.5px #b9dbe4,inset 0 -4px 0 #b9dbe4}.c-Other{background:#8a7a72;color:#fff}
+.empty{color:var(--mute);padding:30px 0}
+.side{background:var(--soft);border-left:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.held{display:flex;gap:6px;flex-wrap:wrap;padding:12px 16px 0}
+.held button{background:var(--bg);border:1.5px dashed var(--line);border-radius:10px;padding:6px 10px;font-size:14px;font-weight:600;min-height:36px}
+.held{grid-row:1}.roll{grid-row:2;overflow:auto;padding:12px 16px}.side>.act{grid-row:3}
+.paper{background:var(--paper);color:#1f1110;font:14px/1.45 'IBM Plex Mono',monospace;padding:16px 16px 26px;border-radius:6px 6px 0 0;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%}
+.paper h2{font:400 22px Anton,Impact,sans-serif;letter-spacing:.03em;text-transform:uppercase;margin:0 0 2px;text-align:center}
+.paper .sub{text-align:center;color:#6e5c59;font-size:13px;margin-bottom:10px}
+.paper .hd{text-align:center;color:#4a3a37;font-size:12.5px;line-height:1.4}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:8px 0;border-top:1px dashed #d9ccc9}
+.line .nm{font-weight:600}
+.line .amt{text-align:right;white-space:nowrap;font-weight:600}
+.line .det{grid-column:1/-1;color:#6e5c59;font-size:13px}
+.qty{display:flex;align-items:center;gap:6px;grid-column:1/-1;margin-top:4px}
+.qty button{min-width:34px;height:34px;border-radius:8px;background:#f1e8e6;font-weight:800;color:#1f1110;padding:0 8px}
+.qty em{font-style:normal;min-width:2ch;text-align:center}
+.qty .x{margin-left:auto;background:none;color:var(--red);font-size:13px}
+.tot{border-top:1px dashed #d9ccc9;margin-top:6px;padding-top:8px}
+.tot div{display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+.tot .big{font:400 28px Anton,Impact,sans-serif;letter-spacing:.02em;margin-top:6px}
+.disc{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.disc button{flex:1;border:1.5px solid #d9ccc9;border-radius:8px;padding:6px 0;font:600 13px 'IBM Plex Mono',monospace;color:#1f1110;min-height:36px}
+.disc button[aria-pressed=true]{background:#1f1110;color:#fff;border-color:#1f1110}
+.act{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px 16px;border-top:1px solid var(--line);background:var(--soft)}
+.btn{border-radius:12px;padding:12px;font-weight:700;min-height:48px;background:var(--bg);border:1.5px solid var(--line);text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+a.btn{color:var(--ink)}
+.btn.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.pay{grid-column:1/-1;background:var(--acc);letter-spacing:.01em;color:#fff;border:0;font-size:20px;font-weight:800;min-height:60px;display:flex;justify-content:space-between;align-items:center;padding:0 20px}
+.pay.sm{grid-column:auto;font-size:17px;justify-content:center;min-height:48px}
+.wrap{max-width:1240px;margin:0 auto;padding:24px max(2vw,16px) 40px}
+.wrap h2{font:400 clamp(28px,4vw,40px)/1.05 Anton,Impact,sans-serif;letter-spacing:.01em;color:var(--brown);margin:0 0 18px;text-wrap:balance}
+.wrap h3{font-size:18px;margin:0 0 10px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+.toolbar input[type=date]{padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);min-height:44px}
+.toolbar .sp{flex:1}
+.pill{font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--soft);white-space:nowrap}
+.pill.ok{background:var(--acc);color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(10em,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--sky);border-radius:14px;padding:14px 16px}
+.stat b{display:block;font:400 clamp(24px,3vw,32px) Anton,Impact,sans-serif;letter-spacing:.02em;color:var(--brown);white-space:nowrap}
+.stat span{color:var(--mute);font-size:14px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:24px;align-items:start}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;color:var(--mute);font-weight:600;border-bottom:1.5px solid var(--line);padding:8px 6px}
+td{padding:8px 6px;border-bottom:1px solid var(--line)}
+.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tag{font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--soft);white-space:nowrap}
+.tag.mp{background:var(--acc);color:#fff}.tag.ref{background:var(--red);color:#fff}
+.link{color:var(--brown);text-decoration:underline;text-underline-offset:3px;font-weight:700;padding:6px}
+td input,td select,.add input,.add select,.form input,.form textarea{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:40px}
+.add{display:grid;grid-template-columns:minmax(0,2fr) repeat(6,minmax(0,1fr)) auto;gap:8px;margin:0 0 14px;align-items:end}
+.add label,.form label{font-size:14px;color:var(--mute);display:grid;gap:4px}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;max-width:760px}
+.form .wide{grid-column:1/-1}
+.card{border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:18px}
+.card p{margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.note{color:var(--mute);font-size:14px}
+.modal{position:fixed;inset:0;background:rgb(21 11 10/.6);display:none;place-items:center;padding:16px;z-index:10}
+.modal.on{display:grid}
+.box{background:var(--bg);border-radius:18px;padding:22px;width:min(440px,100%);max-height:100%;overflow:auto}
+.box.wide{width:min(560px,100%)}
+.box h3{margin:0 0 4px;font-size:24px}
+.due{font:400 clamp(36px,9vw,48px) Anton,Impact,sans-serif;letter-spacing:.02em;margin:4px 0 14px;white-space:nowrap}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}
+.quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(4.5em,1fr));gap:6px;margin:10px 0}
+.big-in{width:100%;font-size:22px;padding:10px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg)}
+.chg{display:flex;justify-content:space-between;font-size:20px;font-weight:800;margin:10px 0 16px;gap:10px}
+pre.rep{background:var(--paper);color:#1f1110;font:13px/1.45 'IBM Plex Mono',monospace;padding:16px;border-radius:10px;white-space:pre;overflow-x:auto;margin:10px 0 14px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 12px 10px 18px;border-radius:12px;display:none;gap:12px;align-items:center;z-index:20;font-weight:600;max-width:calc(100% - 32px)}
+.toast.on{display:flex}
+.toast button{color:#9fd3e0;font-weight:800;padding:6px 10px}
+@media(max-width:860px){#reg.on{display:block;overflow:auto}.keys{overflow:visible}.side{border-left:0;border-top:1px solid var(--line);overflow:visible}.side>.act{position:fixed;left:0;right:0;bottom:0;z-index:5;box-shadow:0 -6px 18px rgb(0 0 0/.15);padding:10px 16px 12px}#reg.on{padding-bottom:140px}.two{grid-template-columns:minmax(0,1fr)}.add{grid-template-columns:repeat(2,minmax(0,1fr))}.add .wide{grid-column:1/-1}.who{margin-left:0}}
+@media(max-width:600px){header h1{font-size:22px}.logo{width:48px;height:48px}nav button{padding:10px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}table{font-size:13px}th,td{padding:6px 4px}.form{grid-template-columns:minmax(0,1fr)}.clock{display:none}}
+@media(prefers-reduced-motion:reduce){.key{transition:none}}
+@media print{
+@page{margin:3mm}
+html,body{height:auto;background:#fff!important}
+.app,.toast,.modal:not(#rcM){display:none!important}
+#rcM{display:block!important;position:static!important;background:none!important;padding:0!important}
+#rcM .box{width:auto!important;padding:0!important;background:none!important;max-height:none!important;overflow:visible!important;border-radius:0}
+#rcM .box>*:not(#rcPaper){display:none!important}
+#rcPaper{-webkit-mask:none!important;mask:none!important;border-radius:0;padding:0 0 4mm;width:72mm;font-size:12px;color:#000}
+#rcPaper img{width:34mm!important;height:34mm!important}
+#rcPaper .tot .big{font-size:20px}
+#rcPaper *{color:#000!important;border-color:#000!important}
+:root[data-paper="58"] #rcPaper{width:48mm;font-size:10.5px}
+:root[data-paper="58"] #rcPaper img{width:26mm!important;height:26mm!important}
+:root[data-paper="A4"] #rcPaper{width:100mm;font-size:13px}
+}
+.mode{display:flex;gap:6px;margin-bottom:12px;align-items:center}.mode .chip{min-width:7.5em;font-weight:700}#mWhole[aria-pressed=true]{background:#c8102e;color:#fff}.mode .note{margin-left:6px}
+header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav button{color:#111}header nav button[aria-current=true]{background:#c8102e;color:#fff}.who{color:#555}.clock{color:#111}.who select{background:#fff;color:#111;border-color:#111}
+.c-Beef,.c-Goat,.c-Camel{background:#c8102e;color:#fff;box-shadow:inset 0 -5px 0 #8e0b20}.c-Fish{background:#111;color:#fff;box-shadow:inset 0 -5px 0 #c8102e}.c-Chicken{background:#fff;color:#111;box-shadow:inset 0 0 0 2px #111,inset 0 -5px 0 #111}
+:focus-visible{outline-color:#c8102e}.toast button{color:#ff5a6a}.stat{background:#fff;border:1px solid var(--line);border-top:4px solid #c8102e}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c8102e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Silver Meats">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><img class="logo" id="hdrLogo" alt="Silver Meats logo"><h1 id="shopName">Silver Meats 2</h1></div>
+    <nav aria-label="Sections">
+      <button id="n-reg" data-v="reg" aria-current="true">Sell</button>
+      <button id="n-ord" data-v="ord">Sales</button>
+      <button id="n-menu" data-v="menu">Products</button>
+      <button id="n-cust" data-v="cust">Customers</button>
+      <button id="n-set" data-v="set">Settings</button>
+    </nav>
+    <div class="who"><label for="cashier">Cashier</label><select id="cashier"></select><button class="btn" id="lockBtn" style="min-height:40px;padding:6px 12px;display:none" title="Switch back to a cashier">🔒 Lock</button><span class="clock" id="clock"></span></div>
+  </header>
+
+  <main id="reg" class="view on">
+    <section class="keys">
+      <div class="mode" role="group" aria-label="Price type"><button class="chip" id="mRetail" aria-pressed="true">Retail</button><button class="chip" id="mWhole" aria-pressed="false">Wholesale</button><span class="note" id="modeNote"></span></div>
+      <div class="bar">
+        <input id="q" type="search" placeholder="Search  ( / )" aria-label="Search products">
+        <div id="cats" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+    <aside class="side" aria-label="Current sale">
+      <div class="held" id="held"></div>
+      <div class="roll"><div class="paper" id="ticket"></div></div>
+      <div class="act">
+        <button class="btn" id="hold">Hold sale</button>
+        <button class="btn" id="clear">Clear</button>
+        <button class="btn pay" id="charge"><span>Charge</span><span id="chargeAmt">KSh 0</span></button>
+      </div>
+    </aside>
+  </main>
+
+  <main id="ord" class="view"><div class="wrap">
+    <div class="toolbar">
+      <label for="day" class="note">Day</label><input type="date" id="day">
+      <button class="chip" id="dayToday">Today</button>
+      <span class="row" id="perBar" role="group" aria-label="Report period" style="gap:4px"><button class="chip" data-per="day" aria-pressed="true">Day</button><button class="chip" data-per="week" aria-pressed="false">Week</button><button class="chip" data-per="month" aria-pressed="false">Month</button></span>
+      <span id="closedPill"></span><span class="sp"></span>
+      <button class="btn" id="addExp">+ Expense</button>
+      <button class="btn pay sm" id="closeDay">End of day report</button>
+    </div>
+    <div id="ordWrap"></div>
+  </div></main>
+
+  <main id="menu" class="view"><div class="wrap">
+    <h2>Products, prices and stock</h2>
+    <div class="row" style="margin-bottom:14px"><button class="btn pay sm" id="openSi" type="button">+ Stock in from supplier</button></div>
+    <form class="add" id="addForm">
+      <label class="wide">Product<input id="aName" required maxlength="40" placeholder="e.g. Goat meat"></label>
+      <label>Category<select id="aCat"></select></label>
+      <label>Sold by<select id="aUnit"><option value="kg">per kg</option><option value="pc">per piece</option></select></label>
+      <label>Buying price<input id="aCost" type="number" step="10" min="0" placeholder="what you pay"></label>
+      <label>Retail price (KSh)<input id="aPrice" type="number" step="10" min="0" required placeholder="600"></label>
+      <label>Wholesale price<input id="aWprice" type="number" step="10" min="0" placeholder="blank = retail"></label>
+      <label>Stock<input id="aStock" type="number" step="0.5" min="0" placeholder="blank = not counted"></label>
+      <button class="btn pay sm" type="submit">Add</button>
+    </form>
+    <p class="note">Changes save as you type. <b>Buying price</b> is what you pay your supplier per kg or piece; it is used to work out your profit. Leave wholesale blank to use the retail price. Leave stock blank if you don't want to count it. Stock goes down with each sale and back up on a refund.</p>
+    <div class="scroll"><table><thead><tr><th>Product</th><th>Category</th><th>Sold by</th><th class="n">Buying KSh</th><th class="n">Retail KSh</th><th class="n">Wholesale KSh</th><th class="n">In stock</th><th></th></tr></thead><tbody id="menuRows"></tbody></table></div>
+    <h3 style="margin-top:26px">Stock received</h3>
+    <div class="scroll"><table><thead><tr><th>Date</th><th>Product</th><th class="n">Qty</th><th class="n">Cost</th><th>Supplier</th><th>Paid from</th><th></th></tr></thead><tbody id="siRows"></tbody></table></div>
+  </div></main>
+
+  <main id="cust" class="view"><div class="wrap">
+    <h2 id="custTitle">Customers on credit</h2>
+    <div class="stats" id="custStats"></div>
+    <form class="add" id="custForm" style="grid-template-columns:minmax(0,2fr) minmax(0,1.5fr) auto">
+      <label>Customer name<input id="cName" required maxlength="40" placeholder="e.g. Mama Njeri Hotel"></label>
+      <label>Phone<input id="cPhone" maxlength="16" inputmode="tel" placeholder="e.g. 0712 345 678"></label>
+      <button class="btn pay sm" type="submit">Add customer</button>
+    </form>
+    <p class="note">Customers who take meat now and pay later (deni). Sell to them with <b>Charge → Credit</b>, then record each weekly payment here. Red <b>Overdue</b> means no payment for more than 7 days.</p>
+    <div class="scroll"><table><thead><tr><th>Customer</th><th>Phone</th><th class="n">Owes</th><th>Last payment</th><th></th></tr></thead><tbody id="custRows"></tbody></table></div>
+  </div></main>
+
+  <main id="set" class="view"><div class="wrap">
+    <h2>Shop settings</h2>
+    <div class="card">
+      <h3>Receipt details</h3>
+      <p class="note">These print at the top and bottom of every receipt.</p>
+      <div class="form">
+        <label>Shop name<input id="sName" maxlength="40"></label>
+        <label>Location<input id="sLoc" maxlength="120" placeholder="e.g. Kahawa West, Nairobi"></label>
+        <label>Phone<input id="sPhone" maxlength="20" inputmode="tel" placeholder="e.g. 0712 345 678"></label>
+        <label>Opening hours<input id="sHours" maxlength="60" placeholder="e.g. Open 6:00 AM – 4:00 PM"></label>
+        <label>KRA PIN (optional)<input id="sPin" maxlength="15" style="text-transform:uppercase"></label>
+        <label>M-Pesa number (till, paybill or phone)<input id="sTill" maxlength="20" inputmode="numeric"></label>
+        <label>VAT % on sales<input id="sTax" type="number" step="1" min="0" max="30"></label>
+        <label>Receipt printer paper<select id="sPaper" style="width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:40px"><option value="80">80 mm roll (most receipt printers)</option><option value="58">58 mm roll (small printer)</option><option value="A4">A4 / normal printer</option></select></label>
+        <label class="wide">Thank-you line<input id="sFoot" maxlength="60"></label>
+      </div>
+      <p class="note" style="margin-top:12px">Fresh, unprocessed meat is usually VAT-exempt in Kenya, so VAT starts at 0%. Check with KRA or your accountant.</p>
+    </div>
+    <div class="card">
+      <h3>Staff</h3>
+      <p class="note">Everyone who uses the till. Each sale and the end-of-day report shows who served.</p>
+      <div id="staffList" class="row" style="margin-bottom:14px"></div>
+      <form id="staffForm" class="row" style="align-items:end">
+        <label style="flex:1 1 220px;display:grid;gap:4px;font-size:14px;color:var(--mute)">New staff name<input id="sNew" maxlength="30" placeholder="e.g. Peter" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:44px"></label>
+        <button class="btn pay sm" type="submit" style="min-width:9em">Add staff</button>
+      </form>
+      <label class="note" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px">Auto-lock after<select id="sLock" style="padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:15px"><option value="0">Never</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option></select>without use — switches back to a cashier so reports stay private.</label>
+    </div>
+    <div class="card">
+      <h3>Backup</h3>
+      <p>Your sales are saved only on this phone or computer. Copy a backup every week and keep it on WhatsApp (send it to yourself) or in your email.</p>
+      <div class="row"><button class="btn" id="bkCopy">Copy backup</button><button class="btn" id="bkOpen">Restore from backup</button></div>
+      <p class="note" id="bkInfo" style="margin:10px 0 0"></p>
+      <div id="cloudBox" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><b>☁️ Cloud backup (online version)</b><p class="note" id="cloudInfo" style="margin:6px 0 10px"></p><div class="row"><button class="btn" id="cloudSave">Back up to cloud now</button><button class="btn" id="cloudLoad">Restore from cloud</button></div></div>
+    </div>
+    <div class="card">
+      <h3>Start fresh</h3>
+      <p class="note">Removes all sales and held sales. Products, prices and settings stay. Copy a backup first.</p>
+      <button class="btn danger" id="wipe">Delete all sales</button>
+    </div>
+  </div></main>
+</div>
+
+<div class="modal" id="wM" role="dialog" aria-modal="true" aria-labelledby="wT"><div class="box">
+  <h3 id="wT"></h3>
+  <p class="note" id="wPrice" style="margin:0 0 14px"></p>
+  <div class="tabs"><button class="chip" id="byKg" aria-pressed="true">By weight</button><button class="chip" id="byKsh" aria-pressed="false">By shillings</button></div>
+  <label for="wIn" class="note" id="wLbl">Weight on scale (kg)</label>
+  <input id="wIn" class="big-in" type="number" step="0.05" min="0" inputmode="decimal">
+  <div class="quick" id="wQuick"></div>
+  <div class="chg"><span id="wOut1">—</span><span id="wOut2"></span></div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="wCancel">Cancel</button>
+    <button class="btn pay sm" id="wAdd">Add to sale</button>
+  </div>
+</div></div>
+
+<div class="modal" id="payM" role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box">
+  <h3 id="payT">Take payment</h3>
+  <div class="due" id="due"></div>
+  <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="cust" class="big-in" maxlength="40" list="custNames" placeholder="e.g. John" autocomplete="off" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label><datalist id="custNames"></datalist></div>
+  <div class="tabs" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="chip" id="mCash" aria-pressed="true">Cash</button><button class="chip" id="mMp" aria-pressed="false">M-Pesa</button><button class="chip" id="mCr" aria-pressed="false">Credit</button></div>
+  <div id="cashBox">
+    <label for="tend" class="note">Cash received (KSh)</label>
+    <input id="tend" class="big-in" type="number" step="10" min="0" inputmode="numeric">
+    <div class="quick" id="quick"></div>
+    <div class="chg"><span>Change</span><span id="chg">KSh 0</span></div>
+  </div>
+  <div id="mpBox" style="display:none">
+    <p class="note" id="mpTill" style="margin-top:0"></p>
+    <label for="mpCode" class="note">M-Pesa confirmation code</label>
+    <input id="mpCode" class="big-in" maxlength="12" placeholder="e.g. SKL4H7XQ2P" style="text-transform:uppercase">
+    <p class="note">Check the customer's SMS or your till statement before completing.</p>
+  </div>
+  <div id="crBox" style="display:none">
+    <label for="crCust" class="note">Customer (pays later)</label>
+    <select id="crCust" class="big-in" style="font-size:18px"></select>
+    <div id="crNew" style="display:none;margin-top:8px"><input id="crName" class="big-in" maxlength="40" placeholder="New customer name" style="font-size:18px;margin-bottom:8px"><input id="crPhone" class="big-in" maxlength="16" inputmode="tel" placeholder="Phone (for reminders)" style="font-size:18px"></div>
+    <p class="note" id="crInfo"></p>
+  </div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="payCancel">Back</button>
+    <button class="btn pay sm" id="payDone">Complete</button>
+  </div>
+</div></div>
+
+<div class="modal" id="rcM" role="dialog" aria-modal="true" aria-label="Receipt"><div class="box" style="background:var(--soft)">
+  <div class="paper" id="rcPaper"></div>
+  <label for="rcName" class="note" style="display:block;margin-top:14px">Customer name on this receipt</label>
+  <input id="rcName" class="big-in" maxlength="40" placeholder="Type name, then press Enter" style="font-size:18px;margin-bottom:8px">
+  <label for="rcPhone" class="note" style="display:block">Customer WhatsApp number</label>
+  <input id="rcPhone" class="big-in" inputmode="tel" maxlength="16" placeholder="e.g. 0712 345 678" style="font-size:18px">
+  <div class="act" style="padding:10px 0 0;border:0;background:none">
+    <a class="btn pay sm" id="rcWa" target="_blank" rel="noopener" style="grid-column:1/-1;color:#fff;background:#1f8f4e">Send receipt on WhatsApp</a>
+    <button class="btn" id="rcPic">Receipt picture</button>
+    <button class="btn" id="rcCopy">Copy text</button>
+    <button class="btn" style="grid-column:1/-1;font-size:17px" id="rcPrint">🖨️ Print receipt</button>
+    <button class="btn pay sm" style="grid-column:1/-1" id="rcClose">Done</button>
+  </div>
+</div></div>
+
+<div class="modal" id="zM" role="dialog" aria-modal="true" aria-labelledby="zT"><div class="box wide">
+  <h3 id="zT">End of day report</h3>
+  <pre class="rep" id="zText"></pre>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="zCopy">Copy report</button>
+    <a class="btn" id="zWa" target="_blank" rel="noopener">Send on WhatsApp</a>
+    <button class="btn" id="zBack">Back</button>
+    <button class="btn pay sm" id="zClose">Close the day</button>
+  </div>
+</div></div>
+
+<div class="modal" id="bkM" role="dialog" aria-modal="true" aria-labelledby="bkT"><div class="box wide">
+  <h3 id="bkT">Restore from backup</h3>
+  <p class="note">Paste the backup text you copied before. This replaces everything on this device.</p>
+  <textarea id="bkIn" rows="7" style="width:100%;font:13px 'IBM Plex Mono',monospace;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg)"></textarea>
+  <p class="note" id="bkErr" style="color:var(--red)"></p>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="bkNo">Cancel</button>
+    <button class="btn pay sm" id="bkGo">Restore</button>
+  </div>
+</div></div>
+
+<div class="modal" id="cfM" role="alertdialog" aria-modal="true" aria-labelledby="cfT"><div class="box">
+  <h3 id="cfT"></h3>
+  <p id="cfP" class="note"></p>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="cfNo">Cancel</button>
+    <button class="btn pay sm" id="cfOk" style="background:var(--red)">Yes</button>
+  </div>
+</div></div>
+
+<div class="modal" id="picM" role="dialog" aria-modal="true" aria-label="Receipt picture"><div class="box" style="background:var(--soft)">
+  <img id="picImg" alt="Receipt picture" style="display:block;width:100%;height:auto;border-radius:8px;background:#fff">
+  <p class="note" style="margin:12px 0 0">On a phone: <b>press and hold the picture</b>, then choose <b>Share</b> and pick <b>WhatsApp</b>. On a computer: tap <b>Save picture</b> (or <b>Copy picture</b>), then attach or paste it in the customer's WhatsApp chat.</p>
+  <div class="act" style="padding:12px 0 0;border:0;background:none">
+    <button class="btn" id="picCopy">Copy picture</button>
+    <button class="btn" id="picSave">Save picture</button>
+    <button class="btn pay sm" id="picClose" style="grid-column:1/-1">Back</button>
+  </div>
+</div></div>
+
+<div class="modal" id="piM" role="dialog" aria-modal="true" aria-labelledby="piT"><div class="box">
+  <h3 id="piT">Receive payment</h3>
+  <p class="note" id="piInfo" style="margin:0 0 10px"></p>
+  <label for="piAmt" class="note">Amount paid (KSh)</label>
+  <input id="piAmt" class="big-in" type="number" min="1" step="10" inputmode="numeric">
+  <div class="quick" id="piQuick"></div>
+  <div class="tabs"><button class="chip" id="piCash" aria-pressed="true">Cash</button><button class="chip" id="piMp" aria-pressed="false">M-Pesa</button></div>
+  <input id="piCode" class="big-in" maxlength="12" placeholder="M-Pesa code (optional)" style="display:none;font-size:18px;text-transform:uppercase;margin-bottom:10px">
+  <div class="chg"><span>Balance after</span><span id="piAfter"></span></div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="piNo">Cancel</button>
+    <button class="btn pay sm" id="piGo">Save payment</button>
+  </div>
+</div></div>
+
+<div class="modal" id="stM" role="dialog" aria-modal="true" aria-labelledby="stT"><div class="box wide">
+  <h3 id="stT">Statement</h3>
+  <pre class="rep" id="stText"></pre>
+  <div class="act" style="padding:0;border:0;background:none">
+    <a class="btn pay sm" id="stWa" target="_blank" rel="noopener" style="grid-column:1/-1;color:#fff;background:#1f8f4e">Send statement on WhatsApp</a>
+    <button class="btn" id="stCopy">Copy</button>
+    <button class="btn" id="stNo">Back</button>
+  </div>
+</div></div>
+
+<div class="modal" id="pinM" role="dialog" aria-modal="true" aria-labelledby="pinT"><div class="box">
+  <h3 id="pinT"></h3>
+  <p class="note" id="pinP" style="margin:0 0 10px"></p>
+  <input id="pinIn" class="big-in" type="password" inputmode="numeric" maxlength="6" autocomplete="off" style="letter-spacing:.4em;text-align:center">
+  <p class="note" id="pinErr" style="color:var(--red);min-height:1.4em;margin:8px 0"></p>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="pinNo">Cancel</button>
+    <button class="btn pay sm" id="pinOk">OK</button>
+  </div>
+</div></div>
+
+<div class="modal" id="exM" role="dialog" aria-modal="true" aria-labelledby="exT"><div class="box">
+  <h3 id="exT">Add expense</h3>
+  <div class="form" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 14px">
+    <label>Type<select id="exCat" class="big-in" style="font-size:17px"></select></label>
+    <label>Amount (KSh)<input id="exAmt" class="big-in" type="number" min="1" step="10" inputmode="numeric" style="font-size:17px"></label>
+    <label>Paid from<select id="exFrom" class="big-in" style="font-size:17px"><option value="Cash">Cash from drawer</option><option value="M-Pesa">M-Pesa</option><option value="Other">Bank / other</option></select></label>
+    <label>Date<input id="exDate" type="date" class="big-in" style="font-size:17px"></label>
+    <label class="wide">Note (optional)<input id="exNote" class="big-in" maxlength="60" placeholder="e.g. Boda boda delivery" style="font-size:17px"></label>
+  </div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="exNo">Cancel</button>
+    <button class="btn pay sm" id="exGo">Save expense</button>
+  </div>
+</div></div>
+
+<div class="modal" id="siM" role="dialog" aria-modal="true" aria-labelledby="siT"><div class="box">
+  <h3 id="siT">Stock in from supplier</h3>
+  <div class="form" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 6px">
+    <label class="wide">Product<select id="siProd" class="big-in" style="font-size:17px"></select></label>
+    <label><span id="siQL">Quantity (kg)</span><input id="siQty" class="big-in" type="number" min="0" step="0.5" inputmode="decimal" style="font-size:17px"></label>
+    <label><span id="siCL">Buying price per kg</span><input id="siCost" class="big-in" type="number" min="0" step="10" inputmode="numeric" style="font-size:17px"></label>
+    <label>Supplier (optional)<input id="siSup" class="big-in" maxlength="40" list="supNames" style="font-size:17px"></label>
+    <label>Paid from<select id="siFrom" class="big-in" style="font-size:17px"><option value="Cash">Cash from drawer</option><option value="M-Pesa">M-Pesa</option><option value="Other">Bank / other</option><option value="Credit">Not paid yet</option></select></label>
+    <datalist id="supNames"></datalist>
+  </div>
+  <div class="chg"><span>Total cost</span><span id="siTot">KSh 0</span></div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="siNo">Cancel</button>
+    <button class="btn pay sm" id="siGo">Save stock in</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"><span id="toastT"></span><button id="toastU">Undo</button></div>
+
+<script>
+{
+const LOGO='data:image/jpeg;base64,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';
+document.getElementById('hdrLogo').src=LOGO;
+const CATS=['Chicken','Beef','Goat','Camel','Fish','Other'];
+const byCat=a=>a.map((p,i)=>[p,i]).sort((x,y)=>(CATS.indexOf(x[0].cat)-CATS.indexOf(y[0].cat))||x[1]-y[1]).map(x=>x[0]);
+const CC={Beef:'#c8102e',Chicken:'#111111',Goat:'#8e0b20',Camel:'#e0565f',Fish:'#555555',Other:'#999999'};
+const KEY='butchery-pos-v6';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ksh=n=>(n<0?'-':'')+'KSh '+Math.abs(Math.round(n)).toLocaleString('en-KE');
+const kg=n=>(+(+n).toFixed(3))+' kg';
+const r3=n=>Math.round(n*1000)/1000;
+const hm=t=>new Date(t).toLocaleTimeString('en-KE',{hour:'numeric',minute:'2-digit'});
+const dk=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const dayName=k=>new Date(k+'T12:00').toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const qtyTxt=l=>l.unit=='kg'?kg(l.qty):l.qty+' pc';
+const tracked=p=>p.stock!=null&&p.stock!=='';
+const lineCost=l=>{const c=l.cost!=null?l.cost:(prod(l.id)||{}).cost;return c!=null&&c!==''?c*l.qty:null};
+
+function fresh(){
+  const p=[['Beef','Beef','kg',600],['Beef mince','Beef','kg',600],['Whole chicken','Chicken','pc',350],['Boneless breast','Chicken','kg',500],['Legs','Chicken','kg',350],['Drumsticks','Chicken','kg',500],['Wings','Chicken','kg',350],['Thighs','Chicken','kg',250],['Gizzards','Chicken','kg',250],['Chicken liver','Chicken','kg',120],['Neck','Chicken','kg',120],['Kata','Chicken','kg',100],['Chicken feet','Chicken','kg',70],['Goat meat','Goat','kg',750],['Camel meat','Camel','kg',700],['Fish','Fish','kg',900]]
+    .map((a,i)=>({id:'p'+i,name:a[0],cat:a[1],unit:a[2],price:a[3],stock:null}));
+  return {products:p,orders:[],cart:[],held:[],disc:0,tax:0,next:1001,name:'Silver Meats 2',till:'0794 506 667',loc:'Ushrika, Opposite Crossroad Tower, Near Donbosco Girls Secondary School',phone:'0794 506 667',pin:'',footer:'Asante! Karibu tena.',staff:['Owner'],cashier:'Owner',closes:{},v7:1};
+}
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.products)S=fresh();
+if(!S.v7){ /* upgrade: remove the demo sales and demo till number from the first version */
+  S.orders=(S.orders||[]).filter(o=>!(o.no>=1001&&o.no<=1009));
+  S.held=(S.held||[]).filter(h=>h.no!=1010);
+  if(!S.orders.length)S.cart=[];
+  if(S.till=='522 533')S.till='';
+  if(S.name=='Mama Wanjiku Butchery')S.name='Silver Meats 2';
+  Object.assign(S,{loc:S.loc||'',phone:S.phone||'',pin:S.pin||'',footer:S.footer||'Asante! Karibu tena.',staff:S.staff||['Owner'],closes:S.closes||{},v7:1});
+  S.cashier=S.cashier||S.staff[0];
+}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(typeof scheduleCloud=='function')scheduleCloud()};
+if(!S.phone)S.phone='0794 506 667';
+if(S.hours==null)S.hours='Open 6:00 AM – 4:00 PM';
+if(!S.v8){[['goat','Goat meat','Goat',750],['camel','Camel meat','Camel',700],['fish','Fish','Fish',900]].forEach(([id,name,cat,price])=>{if(!S.products.some(p=>p.name.toLowerCase()==name.toLowerCase()))S.products.push({id,name,cat,unit:'kg',price,stock:null})});S.v8=1}
+if(!S.v9){const W={"whole chicken": 300, "boneless breast": 400, "legs": 300, "drumsticks": 400, "wings": 300, "thighs": 220, "gizzards": 250, "chicken liver": 120, "neck": 120, "kata": 100, "chicken feet": 70, "beef": 550, "beef mince": 550, "goat meat": 750, "camel meat": 680, "fish": 900};S.products.forEach(p=>{const v=W[p.name.toLowerCase()];if(v!=null&&!p.wprice)p.wprice=v});S.v9=1}
+if(!S.till)S.till='0794 506 667';
+if(!S.loc)S.loc='Ushrika, Opposite Crossroad Tower, Near Donbosco Girls Secondary School';
+save();
+let cat='All',q='',method='Cash',undo=null,lastOrder=null,tt,wItem=null,wMode='kg',wEdit=-1,selDay=dk(Date.now()),cfFn=null,per='day';
+const prod=id=>S.products.find(p=>p.id==id);
+if(!S.mode)S.mode='retail';
+if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
+const wp=p=>S.mode=='wholesale'&&p.wprice?p.wprice:p.price;
+const inCart=id=>S.cart.filter(l=>l.id==id).reduce((s,l)=>s+l.qty,0);
+function sums(items,disc,tax){
+  const sub=items.reduce((s,l)=>s+l.amt,0),d=Math.round(sub*disc/100),t=Math.round((sub-d)*tax/100);
+  return {sub,d,t,total:sub-d+t};
+}
+function toast(msg,fn){
+  $('toastT').textContent=msg;undo=fn;$('toastU').style.display=fn?'':'none';
+  $('toast').classList.add('on');clearTimeout(tt);tt=setTimeout(()=>$('toast').classList.remove('on'),5000);
+}
+function ask(title,text,ok,fn){$('cfT').textContent=title;$('cfP').textContent=text;$('cfOk').textContent=ok;cfFn=fn;$('cfM').classList.add('on');$('cfNo').focus()}
+$('cfNo').onclick=()=>$('cfM').classList.remove('on');
+$('cfOk').onclick=()=>{$('cfM').classList.remove('on');if(cfFn)cfFn();cfFn=null};
+async function copy(text,msg){try{await navigator.clipboard.writeText(text);toast(msg)}catch(e){toast('Copy not allowed here')}}
+const isPhone=()=>/^(07|01|2547|2541)\d{8}$/.test((S.till||'').replace(/\D/g,''));
+const mpLine=()=>isPhone()?'M-Pesa send money: '+S.till:'Lipa na M-Pesa till '+S.till;
+const wa=text=>'https://wa.me/?text='+encodeURIComponent(text.split('\n').map(s=>s.trim()).join('\n'));
+const waTo=(num,text)=>{let d=(num||'').replace(/\D/g,'');if(/^0[17]\d{8}$/.test(d))d='254'+d.slice(1);else if(/^[17]\d{8}$/.test(d))d='254'+d;return 'https://wa.me/'+(d.length>=11?d:'')+'?text='+encodeURIComponent(text)};
+const wrapT=(t,w)=>{const out=[];let cur='';String(t).split(' ').forEach(x=>{if((cur+' '+x).trim().length>w&&cur){out.push(cur);cur=x}else cur=(cur+' '+x).trim()});if(cur)out.push(cur);return out};
+
+function renderHead(){
+  $('shopName').textContent=S.name||'Silver Meats 2';
+  $('cashier').innerHTML=S.staff.map(n=>`<option value="${esc(n)}"${n==S.cashier?' selected':''}>${esc(n)}${S.roles&&S.roles[n]&&S.roles[n]!='Cashier'&&S.roles[n]!=n?' ('+S.roles[n]+')':''}</option>`).join('');
+}
+
+
+/* ---------- sell ---------- */
+function renderKeys(){
+  $('cats').innerHTML=['All',...CATS.filter(c=>S.products.some(p=>p.cat==c))].map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c==cat}">${c}</button>`).join('');
+  const list=byCat(S.products).filter(p=>(cat=='All'||p.cat==cat)&&p.name.toLowerCase().includes(q));
+  $('grid').innerHTML=list.length?list.map(p=>{
+    const n=inCart(p.id);let st='';
+    if(tracked(p)){const left=r3(p.stock-n),low=left<=(p.unit=='kg'?3:2);st=`<small class="${low?'low':''}">${left<=0?'Out of stock':(p.unit=='kg'?kg(left):left+' pc')+' left'}</small>`}
+    return `<button class="key c-${p.cat}" data-id="${p.id}"><b>${esc(p.name)}</b><span>${ksh(wp(p))}${p.unit=='kg'?' / kg':''}</span>${st}${n?`<i>${p.unit=='kg'?+n.toFixed(2):n}</i>`:''}</button>`}).join(''):'<p class="empty">Nothing matches. Add products on the Products tab.</p>';
+}
+function linesHTML(items,live){
+  return items.map((l,i)=>`<div class="line"><span class="nm">${esc(l.name)}</span><span class="amt">${ksh(l.amt)}</span><span class="det">${qtyTxt(l)} × ${ksh(l.price)}${l.unit=='kg'?'/kg':''}</span>${live?`<div class="qty">${l.unit=='pc'?`<button data-dec="${i}" aria-label="One less">−</button><em>${l.qty}</em><button data-inc="${i}" aria-label="One more">+</button>`:`<button data-rew="${i}">Re-weigh</button>`}<button class="x" data-rm="${i}">Remove</button></div>`:''}</div>`).join('');
+}
+function totHTML(o){
+  return `<div class="tot"><div><span>Subtotal</span><span>${ksh(o.sub)}</span></div>${o.d?`<div><span>Discount ${o.pct}%</span><span>−${ksh(o.d)}</span></div>`:''}${o.t?`<div><span>VAT ${o.tp}%</span><span>${ksh(o.t)}</span></div>`:''}<div class="big"><span>Total</span><span>${ksh(o.total)}</span></div></div>`;
+}
+function renderTicket(){
+  const T=sums(S.cart,S.disc,S.tax);
+  $('ticket').innerHTML=`<h2>Sale #${S.next}</h2><div class="sub">${S.mode=='wholesale'?'<b style="color:#c8102e">WHOLESALE</b> · ':''}${esc(S.cashier)} · ${hm(Date.now())}</div>`+
+    (S.cart.length?linesHTML(S.cart,true)+totHTML({sub:T.sub,d:T.d,pct:S.disc,t:T.t,tp:S.tax,total:T.total}):'<p style="text-align:center;color:#6e5c59;padding:18px 0">Tap a product to start the sale.</p>')+
+    `<div class="disc" role="group" aria-label="Discount">${[0,5,10].map(p=>`<button data-disc="${p}" aria-pressed="${S.disc==p}">${p?p+'% off':'No discount'}</button>`).join('')}</div>`;
+  $('chargeAmt').textContent=ksh(T.total);
+  ['charge','hold','clear'].forEach(id=>$(id).disabled=!S.cart.length);
+  $('held').innerHTML=S.held.map((h,i)=>`<button data-recall="${i}">Recall #${h.no}${h.mode=='wholesale'?' (W)':''} · ${ksh(sums(h.cart,h.disc,S.tax).total)}</button>`).join('');
+  $('held').style.display=S.held.length?'':'none';
+}
+function renderMode(){$('mRetail').setAttribute('aria-pressed',S.mode=='retail');$('mWhole').setAttribute('aria-pressed',S.mode=='wholesale');$('modeNote').textContent=S.mode=='wholesale'?'Wholesale prices':''}
+const renderReg=()=>{renderMode();renderKeys();renderTicket()};
+function setMode(m){S.mode=m;S.cart.forEach(l=>{const p=prod(l.id);if(!p)return;l.price=wp(p);l.amt=Math.round(l.qty*l.price)});save();renderReg()}
+$('mRetail').onclick=()=>setMode('retail');$('mWhole').onclick=()=>setMode('wholesale');
+
+function openWeigh(p,edit){
+  wItem=p;wEdit=edit??-1;$('wT').textContent=p.name;
+  $('wPrice').textContent=ksh(wp(p))+' per kg'+(S.mode=='wholesale'?' (wholesale)':'')+(tracked(p)?' · '+kg(Math.max(0,r3(p.stock-inCart(p.id))))+' in stock':'');
+  setW('kg');if(edit!=null)$('wIn').value=S.cart[edit].qty;updW();$('wM').classList.add('on');$('wIn').focus();
+}
+function setW(m){
+  wMode=m;$('byKg').setAttribute('aria-pressed',m=='kg');$('byKsh').setAttribute('aria-pressed',m=='ksh');
+  $('wLbl').textContent=m=='kg'?'Weight on scale (kg)':'Customer wants meat worth (KSh)';
+  $('wIn').step=m=='kg'?'0.05':'10';$('wIn').value='';
+  $('wQuick').innerHTML=(m=='kg'?[0.25,0.5,1,1.5,2]:[50,100,200,300,500]).map(v=>`<button class="chip" data-w="${v}">${m=='kg'?(v<1?v*1000+' g':v+' kg'):v}</button>`).join('');updW();
+}
+function wLine(){
+  const v=parseFloat($('wIn').value);if(!wItem||!(v>0))return null;
+  const pr=wp(wItem);return wMode=='kg'?{qty:r3(v),amt:Math.round(v*pr)}:{qty:r3(v/pr),amt:Math.round(v)};
+}
+function updW(){const l=wLine();$('wAdd').disabled=!l;$('wOut1').textContent=l?kg(l.qty):'—';$('wOut2').textContent=l?ksh(l.amt):''}
+$('byKg').onclick=()=>setW('kg');$('byKsh').onclick=()=>setW('ksh');
+$('wIn').oninput=updW;
+$('wIn').onkeydown=e=>{if(e.key=='Enter'&&!$('wAdd').disabled)$('wAdd').click()};
+$('wQuick').onclick=e=>{const v=e.target.dataset.w;if(v){$('wIn').value=v;updW()}};
+$('wCancel').onclick=()=>$('wM').classList.remove('on');
+$('wAdd').onclick=()=>{
+  const l=wLine();if(!l)return;const p=wItem,line={id:p.id,name:p.name,price:wp(p),unit:'kg',cost:p.cost??null,...l};
+  if(wEdit>=0)S.cart[wEdit]=line;else S.cart.push(line);
+  $('wM').classList.remove('on');save();renderReg();
+  if(tracked(p)&&r3(p.stock-inCart(p.id))<0)toast('Heads up: more '+p.name+' than recorded stock');
+};
+function add(id){
+  const p=prod(id);if(!p)return;
+  if(p.unit=='kg')return openWeigh(p);
+  const l=S.cart.find(x=>x.id==id);
+  if(l){l.qty++;l.amt=l.qty*l.price}else S.cart.push({id:p.id,name:p.name,price:wp(p),unit:'pc',qty:1,amt:wp(p),cost:p.cost??null});
+  save();renderReg();
+}
+$('grid').onclick=e=>{const b=e.target.closest('[data-id]');if(b)add(b.dataset.id)};
+$('cats').onclick=e=>{const b=e.target.closest('[data-c]');if(b){cat=b.dataset.c;renderKeys()}};
+$('q').oninput=e=>{q=e.target.value.trim().toLowerCase();renderKeys()};
+$('ticket').onclick=e=>{
+  const d=e.target.dataset,L=S.cart;
+  if(d.inc){L[d.inc].qty++;L[d.inc].amt=L[d.inc].qty*L[d.inc].price}
+  else if(d.dec){const l=L[d.dec];l.qty--;l.amt=l.qty*l.price;if(!l.qty)L.splice(d.dec,1)}
+  else if(d.rm)L.splice(d.rm,1);
+  else if(d.rew){const p=prod(L[d.rew].id);if(p)openWeigh(p,+d.rew);return}
+  else if(d.disc)S.disc=+d.disc;
+  else return;
+  save();renderReg();
+};
+$('clear').onclick=()=>{const c=S.cart,d=S.disc;S.cart=[];S.disc=0;save();renderReg();toast('Sale cleared',()=>{S.cart=c;S.disc=d;save();renderReg()})};
+$('hold').onclick=()=>{S.held.push({no:S.next++,cart:S.cart,disc:S.disc,mode:S.mode});S.cart=[];S.disc=0;save();renderReg();toast('Sale held')};
+$('held').onclick=e=>{const i=e.target.dataset.recall;if(i==null)return;
+  if(S.cart.length)S.held.push({no:S.next++,cart:S.cart,disc:S.disc,mode:S.mode});
+  const h=S.held.splice(i,1)[0];S.cart=h.cart;S.disc=h.disc;S.mode=h.mode||'retail';save();renderReg()};
+
+/* ---------- payment & receipt ---------- */
+function setMethod(m){method=m;$('mCash').setAttribute('aria-pressed',m=='Cash');$('mMp').setAttribute('aria-pressed',m=='M-Pesa');$('mCr').setAttribute('aria-pressed',m=='Credit');$('cashBox').style.display=m=='Cash'?'':'none';$('mpBox').style.display=m=='M-Pesa'?'':'none';$('crBox').style.display=m=='Credit'?'':'none';$('custBox').style.display=m=='Credit'?'none':'grid';updChange()}
+function updChange(){
+  const T=sums(S.cart,S.disc,S.tax),v=parseFloat($('tend').value)||0,c=v-T.total,cv=$('crCust').value,ok=method=='M-Pesa'||(method=='Credit'?(cv&&cv!='new')||(cv=='new'&&$('crName').value.trim()):(!v||c>=0));
+  $('chg').textContent=method=='Cash'&&v?(c>=0?ksh(c):'Short '+ksh(-c)):'KSh 0';
+  $('payDone').disabled=!ok;$('payDone').textContent=method=='M-Pesa'?'M-Pesa received':method=='Credit'?'Add to account':'Complete';
+}
+$('charge').onclick=()=>{
+  const T=sums(S.cart,S.disc,S.tax);$('due').textContent=ksh(T.total);$('tend').value='';$('mpCode').value='';$('cust').value='';$('custPh').value='';$('custNames').innerHTML=[...new Set([...S.customers.map(c=>c.name),...S.orders.slice(-300).map(o=>o.customer).filter(Boolean)])].map(n=>`<option value="${esc(n)}">`).join('');
+  $('mpTill').textContent=S.till?(isPhone()?`Customer sends ${ksh(T.total)} by M-Pesa (Send Money) to ${S.till}.`:`Customer pays ${ksh(T.total)} to till / paybill ${S.till}.`):`Customer pays ${ksh(T.total)} by M-Pesa. Add your M-Pesa number in Settings.`;
+  const qs=[T.total,Math.ceil(T.total/50)*50,Math.ceil(T.total/100)*100,Math.ceil(T.total/500)*500,Math.ceil(T.total/1000)*1000];
+  $('quick').innerHTML=[...new Set(qs)].slice(0,5).map((v,i)=>`<button class="chip" data-t="${v}">${i?v.toLocaleString('en-KE'):'Exact'}</button>`).join('');
+  renderCrSelect();setMethod('Cash');$('payM').classList.add('on');$('tend').focus();
+};
+$('quick').onclick=e=>{const t=e.target.dataset.t;if(t){$('tend').value=t;updChange()}};
+$('tend').oninput=updChange;
+$('cust').oninput=()=>{const c=S.customers.find(x=>x.name.toLowerCase()==$('cust').value.trim().toLowerCase())||S.orders.slice().reverse().find(o=>o.customer&&o.custPhone&&o.customer.toLowerCase()==$('cust').value.trim().toLowerCase());const ph=c&&(c.phone||c.custPhone);if(ph&&!$('custPh').value)$('custPh').value=ph};
+$('mCash').onclick=()=>setMethod('Cash');$('mMp').onclick=()=>setMethod('M-Pesa');$('mCr').onclick=()=>setMethod('Credit');
+$('payCancel').onclick=()=>$('payM').classList.remove('on');
+const moveStock=(o,sign)=>o.items.forEach(l=>{const p=prod(l.id);if(p&&tracked(p))p.stock=r3(p.stock+sign*l.qty)});
+$('payDone').onclick=()=>{
+  const T=sums(S.cart,S.disc,S.tax);let cr=null;if(method=='Credit'){cr=crCustomer();if(!cr)return}
+  const o={no:S.next++,time:Date.now(),items:S.cart.map(l=>({...l})),sub:T.sub,disc:T.d,discPct:S.disc,tax:T.t,taxPct:S.tax,total:T.total,method,status:'Paid',cashier:S.cashier,mode:S.mode};
+  if(method!='Credit'){const c=$('cust').value.trim(),ph=$('custPh').value.trim();if(c)o.customer=c;if(ph)o.custPhone=ph}
+  if(method=='Cash'){o.tendered=parseFloat($('tend').value)||o.total;o.change=o.tendered-o.total}
+  else if(method=='M-Pesa')o.code=$('mpCode').value.trim().toUpperCase();
+  else{o.custId=cr.id;o.customer=cr.name}
+  moveStock(o,-1);S.orders.push(o);S.cart=[];S.disc=0;save();
+  $('payM').classList.remove('on');openReceipt(o);renderReg();
+};
+function head(){return [S.loc,S.phone?'Tel '+S.phone:'',S.hours||'',S.pin?'KRA PIN '+S.pin.toUpperCase():''].filter(Boolean)}
+function receiptText(o){
+  const w=32,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,c=t=>' '.repeat(Math.max(0,Math.floor((w-t.length)/2)))+t;
+  return [c((S.name||'').toUpperCase()),...head().flatMap(h=>wrapT(h,w)).map(c),'-'.repeat(w),'Receipt #'+o.no,new Date(o.time).toLocaleString('en-KE'),...(o.cashier?['Served by '+o.cashier]:[]),...(o.mode=='wholesale'?['WHOLESALE SALE']:[]),...(o.customer&&o.method!='Credit'?['Customer: '+o.customer]:[]),'-'.repeat(w),
+    ...o.items.flatMap(l=>[l.name.slice(0,w),row('  '+qtyTxt(l)+' x '+l.price,ksh(l.amt))]),'-'.repeat(w),row('Subtotal',ksh(o.sub)),
+    ...(o.disc?[row('Discount '+o.discPct+'%','-'+ksh(o.disc))]:[]),...(o.tax?[row('VAT '+o.taxPct+'%',ksh(o.tax))]:[]),row('TOTAL',ksh(o.total)),
+    ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:[row('Paid '+o.method,ksh(o.tendered||o.total))]),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
+    ...(S.till?wrapT(mpLine(),w).map(c):[]),'',o.status=='Refunded'?c('*** REFUNDED ***'):c(S.footer||'')].join('\n');
+}
+function openReceipt(o){
+  lastOrder=o;
+  $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(S.name)}</h2>${head().map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
+    linesHTML(o.items,false)+totHTML({sub:o.sub,d:o.disc,pct:o.discPct,t:o.tax,tp:o.taxPct,total:o.total})+
+    `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
+    `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>`;
+  $('rcPhone').value=o.custPhone||'';$('rcName').value=o.customer||'';$('rcName').disabled=o.method=='Credit';updWa();
+  $('rcM').classList.add('on');
+}
+$('rcClose').onclick=()=>{$('rcM').classList.remove('on');if($('ord').classList.contains('on'))renderOrders()};
+$('rcCopy').onclick=()=>copy(receiptText(lastOrder),'Receipt copied');
+function waMsg(o){return '```\n'+receiptText(o)+'\n```'}
+function updWa(){if(lastOrder)$('rcWa').href=waTo($('rcPhone').value,waMsg(lastOrder))}
+$('rcPhone').oninput=updWa;
+$('rcName').onchange=()=>{if(!lastOrder||lastOrder.method=='Credit')return;const v=$('rcName').value.trim();if(v)lastOrder.customer=v;else delete lastOrder.customer;save();openReceipt(lastOrder);toast(v?'Name added to receipt':'Name removed');if($('ord').classList.contains('on'))renderOrders()};
+$('rcName').onkeydown=e=>{if(e.key=='Enter')$('rcName').blur()};
+$('rcWa').onclick=()=>{const v=$('rcPhone').value.trim();if(lastOrder&&v){lastOrder.custPhone=v;save()}};
+async function receiptPic(o){
+  try{await document.fonts.load('22px "IBM Plex Mono"');await document.fonts.load('bold 22px "IBM Plex Mono"')}catch(e){}
+  const lines=receiptText(o).split('\n'),cv=document.createElement('canvas'),x=cv.getContext('2d'),F='22px "IBM Plex Mono", monospace',pad=34,lh=31;
+  x.font=F;const W=Math.ceil(x.measureText('M'.repeat(32)).width)+pad*2,L=190,H=pad+L+14+lines.length*lh+pad;
+  cv.width=W*2;cv.height=H*2;x.scale(2,2);x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  const img=new Image();img.src=LOGO;try{await img.decode();x.drawImage(img,(W-L)/2,pad,L,L)}catch(e){}
+  lines.forEach((t,i)=>{const big=/^TOTAL/.test(t)||i==0;x.font=(big?'bold ':'')+F;x.fillStyle=/WHOLESALE|REFUNDED/.test(t)?'#c8102e':'#111';x.fillText(t,pad,pad+L+14+(i+0.8)*lh)});
+  x.fillStyle='#c8102e';x.fillRect(0,H-6,W,6);
+  return cv;
+}
+$('rcPic').onclick=async()=>{if(!lastOrder)return;$('rcPic').textContent='Making picture…';
+  try{const cv=await receiptPic(lastOrder),url=cv.toDataURL('image/png');$('picImg').src=url;$('picSave').dataset.name='Receipt-'+lastOrder.no+'.png';$('picM').classList.add('on')}
+  catch(e){toast('Could not make the picture: '+(e&&e.message||e))}
+  finally{$('rcPic').textContent='Receipt picture'}};
+$('picClose').onclick=()=>$('picM').classList.remove('on');
+let DL=null;(async()=>{try{if(window.claude&&window.claude.use)DL=await window.claude.use('downloads')}catch(e){}})();
+$('picSave').onclick=async()=>{const url=$('picImg').src,name=$('picSave').dataset.name||'Receipt.png';if(!url)return;
+  if(DL){try{const b=await (await fetch(url)).blob();await DL.save({filename:name,data:b});toast('Picture saved')}catch(e){const c=e&&e.code;if(c=='declined')return;toast(c=='host_unavailable'?'This app cannot save files. Press and hold the picture instead.':'Could not save: '+((e&&e.message)||c))}return}
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Picture saved to Downloads')};
+$('picCopy').onclick=async()=>{try{const b=await (await fetch($('picImg').src)).blob();await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);toast('Picture copied. Paste it in WhatsApp.')}catch(e){toast('Copy not allowed here. Press and hold the picture instead.')}};
+
+/* ---------- sales & end of day ---------- */
+function rangeOf(day,p){const d=new Date(day+'T00:00:00');let a,b;
+  if(p=='week'){a=new Date(d);a.setDate(d.getDate()-((d.getDay()+6)%7));b=new Date(a);b.setDate(a.getDate()+7)}
+  else if(p=='month'){a=new Date(d.getFullYear(),d.getMonth(),1);b=new Date(d.getFullYear(),d.getMonth()+1,1)}
+  else{a=d;b=new Date(d);b.setDate(d.getDate()+1)}
+  const f=x=>x.toLocaleDateString('en-KE',{day:'numeric',month:'short'});
+  return {a:+a,b:+b,label:p=='week'?'Week '+f(a)+' – '+f(new Date(+b-864e5)):p=='month'?a.toLocaleDateString('en-KE',{month:'long',year:'numeric'}):dayName(day)}}
+function report(day,p=per){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<RG.b;
+  const pays=S.payments.filter(x=>inR(x.time)),payCash=pays.filter(x=>x.method=='Cash').reduce((a,x)=>a+x.amount,0),payMp=pays.filter(x=>x.method=='M-Pesa').reduce((a,x)=>a+x.amount,0);
+  const all=S.orders.filter(o=>inR(o.time)),paid=all.filter(o=>o.status=='Paid'),ref=all.filter(o=>o.status=='Refunded');
+  const sum=(a,f)=>a.reduce((s,o)=>s+f(o),0),prods={},staff={};
+  paid.forEach(o=>{o.items.forEach(l=>{const k=l.name;prods[k]=prods[k]||{qty:0,unit:l.unit,amt:0,cost:0,known:0,missing:0,cat:(prod(l.id)||{}).cat||'Other'};prods[k].qty+=l.qty;prods[k].amt+=l.amt;const lc=lineCost(l);if(lc==null)prods[k].missing+=l.amt;else{prods[k].cost+=lc;prods[k].known+=l.amt}});const c=o.cashier||'—';staff[c]=staff[c]||{n:0,amt:0};staff[c].n++;staff[c].amt+=o.total});
+  const kgCat=c=>Object.values(prods).filter(p=>p.cat==c&&p.unit=='kg').reduce((s,p)=>s+p.qty,0);
+  const pv=Object.values(prods),costT=pv.reduce((a,x)=>a+x.cost,0),knownT=pv.reduce((a,x)=>a+x.known,0),missingT=pv.reduce((a,x)=>a+x.missing,0),profit=knownT-costT-(sum(paid,o=>o.disc)*(knownT/Math.max(1,knownT+missingT)));
+  const exps=S.expenses.filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
+  const sins=S.stockIns.filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
+  const days={},dd=k=>days[k]=days[k]||{n:0,amt:0,profit:0,exp:0};paid.forEach(o=>{const x=dd(dk(o.time));x.n++;x.amt+=o.total;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});exps.forEach(e=>{dd(dk(e.time)).exp+=e.amount});
+  return {RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid.filter(o=>o.method=='Cash'),o=>o.total)+payCash-expCash-stockCash,mp:sum(paid.filter(o=>o.method=='M-Pesa'),o=>o.total)+payMp-expMp-stockMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
+}
+function catGroups(R){
+  return CATS.map(c=>{
+    const names=[...new Set([...byCat(S.products).filter(p=>p.cat==c).map(p=>p.name),...Object.keys(R.prods).filter(n=>R.prods[n].cat==c)])];
+    const rows=names.map(n=>{const x=R.prods[n],pr=S.products.find(y=>y.name==n);return {n,qty:x?x.qty:0,unit:x?x.unit:(pr?pr.unit:'kg'),amt:x?x.amt:0,profit:x&&x.known?x.known-x.cost:null,missing:x?x.missing:0}});
+    return {c,rows,kg:rows.filter(r=>r.unit=='kg').reduce((a,r)=>a+r.qty,0),pc:rows.filter(r=>r.unit=='pc').reduce((a,r)=>a+r.qty,0),amt:rows.reduce((a,r)=>a+r.amt,0),profit:rows.reduce((a,r)=>a+(r.profit||0),0),missing:rows.reduce((a,r)=>a+r.missing,0)};
+  }).filter(g=>g.rows.length);
+}
+const gq=g=>[g.kg?kg(g.kg):'',g.pc?g.pc+' pc':''].filter(Boolean).join(' + ')||'—';
+function groupTable(R){
+  const G=catGroups(R);
+  return `<div class="scroll"><table class="grp"><thead><tr><th>Product</th><th class="n">Qty</th><th class="n">KSh</th><th class="n">Profit</th></tr></thead>${G.map(g=>`<tbody><tr style="background:${g.c=='Chicken'?'#111':'#c8102e'};color:#fff"><th style="color:#fff;padding:10px 8px">${esc(g.c)}</th><th class="n" style="color:#fff">${gq(g)}</th><th class="n" style="color:#fff">${ksh(g.amt)}</th><th class="n" style="color:#fff">${g.amt?ksh(g.profit)+(g.missing?'*':''):'—'}</th></tr>${g.rows.map(r=>`<tr${r.qty?'':' style="color:#9a9a9a"'}><td style="padding-left:18px">${esc(r.n)}</td><td class="n">${r.qty?(r.unit=='kg'?kg(r.qty):r.qty+' pc'):'—'}</td><td class="n">${r.qty?ksh(r.amt):'—'}</td><td class="n">${!r.qty?'—':r.profit==null?'<span title="Add a buying price" style="color:#c8102e">set buying</span>':ksh(r.profit)}</td></tr>`).join('')}</tbody>`).join('')}</table></div>`;
+}
+function renderOrders(){
+  $('day').value=selDay;document.querySelectorAll('#perBar [data-per]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.per==per));
+  const R=report(selDay),cl=per=='day'?S.closes[selDay]:null,isToday=per=='day'&&selDay==dk(Date.now());
+  $('closeDay').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';
+  $('closedPill').innerHTML=cl?`<span class="pill ok">Closed by ${esc(cl.by)} at ${hm(cl.at)}</span>`:'';
+  const when=per=='day'?(isToday?'today':'on '+R.RG.label):'· '+R.RG.label;
+  const st=(v,l,c)=>`<div class="stat"><b${c?` style="color:${c}"`:""}>${v}</b><span>${l}</span></div>`;
+  const exRows=R.exps.slice().sort((a,b)=>b.time-a.time).map(e=>`<tr><td style="white-space:nowrap">${new Date(e.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(e.cat)}${e.note?' <span class="note">· '+esc(e.note)+'</span>':''}</td><td>${esc(e.from=='Cash'?'Drawer':e.from)}</td><td class="n">${ksh(e.amount)}</td><td class="n"><button class="link" data-exdel="${e.id}">Delete</button></td></tr>`).join('');
+  const dayRows=Object.entries(R.days).sort((a,b)=>a[0]<b[0]?-1:1).map(([k,d])=>`<tr><td><button class="link" data-goday="${k}">${new Date(k+'T12:00').toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})}</button></td><td class="n">${d.n}</td><td class="n">${ksh(d.amt)}</td><td class="n">${ksh(d.profit)}</td><td class="n">${d.exp?ksh(d.exp):'—'}</td><td class="n"><b>${ksh(d.profit-d.exp)}</b></td></tr>`).join('');
+  $('ordWrap').innerHTML=`<h2>${R.paid.length?`${ksh(R.net)} from ${R.paid.length} sale${R.paid.length==1?'':'s'} ${when}`:`No sales ${per=='day'?(isToday?'yet today':'on '+R.RG.label):'· '+R.RG.label}`}</h2>
+  <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${st(ksh(R.netProfit),'Net profit (after expenses)',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
+  <div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
+  <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}</div>
+  <div>${per=='day'?`<h3>Receipts</h3>${R.all.length?`<div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Cashier</th><th>Paid by</th><th class="n">Total</th><th></th></tr></thead><tbody>
+  ${R.all.slice().reverse().map(o=>`<tr><td>${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}">View</button>${o.status=='Paid'?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
+  </tbody></table></div>`:'<p class="note">No receipts for this day.</p>'}`:`<h3>Day by day</h3>${dayRows?`<div class="scroll"><table><thead><tr><th>Day</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Profit</th><th class="n">Expenses</th><th class="n">Net</th></tr></thead><tbody>${dayRows}</tbody></table></div><p class="note">Tap a day to open it.</p>`:'<p class="note">No sales in this period.</p>'}`}</div></div>`;
+}
+function zText(day){
+  const R=report(day),w=34,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,cl=per=='day'?S.closes[day]:null;
+  return [(S.name||'').toUpperCase(),(per=='day'?'END OF DAY REPORT':per=='week'?'WEEKLY REPORT':'MONTHLY REPORT'),R.RG.label,'='.repeat(w),
+    row('Sales',String(R.paid.length)),row('Gross sales',ksh(R.gross)),...(R.disc?[row('Discounts','-'+ksh(R.disc))]:[]),...(R.tax?[row('VAT',ksh(R.tax))]:[]),row('NET TAKINGS',ksh(R.net)),row('Buying cost',ksh(R.costT)),row('PROFIT ON MEAT',ksh(R.profit)),row('Expenses','-'+ksh(R.expT)),row('NET PROFIT',ksh(R.netProfit)),...(R.stockT?[row('Stock bought',ksh(R.stockT))]:[]),...(R.missingT?['(* '+ksh(R.missingT)+' sold without buying price)']:[]),
+    ...(R.ref.length?[row('Refunds ('+R.ref.length+')',ksh(R.refAmt))]:[]),'-'.repeat(w),row('Retail',ksh(R.net-R.whole)),row('Wholesale ('+R.wholeN+')',ksh(R.whole)),'-'.repeat(w),row('Cash in drawer',ksh(R.cash)),row('M-Pesa',ksh(R.mp)),...(R.credit?[row('Sold on credit',ksh(R.credit))]:[]),...(R.payCash+R.payMp?[row('Debt paid (in above)',ksh(R.payCash+R.payMp))]:[]),'-'.repeat(w),'SALES BY PRODUCT',
+    ...catGroups(R).filter(g=>g.amt>0).flatMap(g=>['',row(g.c.toUpperCase()+' '+gq(g),ksh(g.amt)),...g.rows.filter(r=>r.qty>0).map(r=>row('  '+r.n.slice(0,16)+' '+(r.unit=='kg'?kg(r.qty):r.qty+'pc'),ksh(r.amt)))]),
+    ...(R.exps.length?['-'.repeat(w),'EXPENSES',...R.exps.map(e=>row((e.cat+(e.note?' '+e.note:'')).slice(0,22),ksh(e.amount)))]:[]),
+    ...(per!='day'?['-'.repeat(w),'DAY BY DAY',...Object.entries(R.days).sort().map(([k,d])=>row(new Date(k+'T12:00').toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'}),ksh(d.amt)))]:[]),
+    '-'.repeat(w),'CASHIERS',
+    ...Object.entries(R.staff).map(([n,s])=>row(n.slice(0,18)+' ('+s.n+')',ksh(s.amt))),'='.repeat(w),
+    cl?'Closed by '+cl.by+' at '+hm(cl.at):'Printed '+new Date().toLocaleString('en-KE')].join('\n');
+}
+function openZ(){
+  $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));
+  $('zClose').style.display=per!='day'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
+}
+$('closeDay').onclick=openZ;
+$('zBack').onclick=()=>$('zM').classList.remove('on');
+$('zCopy').onclick=()=>copy(zText(selDay),'Report copied');
+$('zClose').onclick=()=>{S.closes[selDay]={at:Date.now(),by:S.cashier};save();openZ();renderOrders();toast('Day closed')};
+$('day').onchange=e=>{if(e.target.value){selDay=e.target.value;renderOrders()}};
+$('dayToday').onclick=()=>{selDay=dk(Date.now());renderOrders()};
+$('ordWrap').onclick=e=>{
+  const d0=e.target.dataset;if(d0.goday){selDay=d0.goday;per='day';renderOrders();return}
+  if(d0.exdel){const x=S.expenses.find(y=>y.id==d0.exdel);if(x)ask('Delete this expense?',x.cat+' '+ksh(x.amount),'Delete',()=>{S.expenses=S.expenses.filter(y=>y!==x);save();renderOrders()});return}
+  const d=e.target.dataset,o=S.orders.find(x=>x.no==(d.view||d.refund));if(!o)return;
+  if(d.view)openReceipt(o);
+  if(d.refund)ask('Refund receipt #'+o.no+'?',`${ksh(o.total)} paid by ${o.method}. Give the money back to the customer. Stock will be added back.`,'Refund',()=>{o.status='Refunded';o.refundedBy=S.cashier;moveStock(o,1);save();renderOrders();toast('Receipt #'+o.no+' refunded')});
+};
+
+
+/* ---------- customers on credit ---------- */
+const custById=id=>S.customers.find(c=>c.id==id);
+const custSales=id=>S.orders.filter(o=>o.method=='Credit'&&o.custId==id&&o.status=='Paid');
+const custPays=id=>S.payments.filter(x=>x.custId==id);
+const balance=id=>custSales(id).reduce((a,o)=>a+o.total,0)-custPays(id).reduce((a,x)=>a+x.amount,0);
+const lastPay=id=>custPays(id).reduce((m,x)=>Math.max(m,x.time),0);
+function overdue(id){if(balance(id)<=0)return false;const lp=lastPay(id)||Math.min(...custSales(id).map(o=>o.time),Date.now());return Date.now()-lp>7*864e5}
+function renderCrSelect(){
+  $('crCust').innerHTML='<option value="">— choose customer —</option>'+S.customers.map(c=>`<option value="${c.id}">${esc(c.name)} (owes ${ksh(balance(c.id))})</option>`).join('')+'<option value="new">+ New customer</option>';
+  $('crName').value='';$('crPhone').value='';$('crNew').style.display='none';$('crInfo').textContent='';
+}
+$('crCust').onchange=()=>{const v=$('crCust').value;$('crNew').style.display=v=='new'?'':'none';const T=sums(S.cart,S.disc,S.tax);$('crInfo').textContent=v&&v!='new'?`New balance will be ${ksh(balance(v)+T.total)}`:'';updChange()};
+$('crName').oninput=updChange;
+function crCustomer(){const v=$('crCust').value;if(v=='new'){const n=$('crName').value.trim();if(!n)return null;const c={id:'c'+Date.now(),name:n,phone:$('crPhone').value.trim(),created:Date.now()};S.customers.push(c);return c}return v?custById(v):null}
+function stmtText(c){
+  const w=34,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b;
+  const ev=[...custSales(c.id).map(o=>({t:o.time,d:'Sale #'+o.no,a:o.total})),...custPays(c.id).map(x=>({t:x.time,d:'Paid '+x.method,a:-x.amount}))].sort((a,b)=>a.t-b.t);
+  let bal=0;const L=ev.map(e=>{bal+=e.a;return row(new Date(e.t).toLocaleDateString('en-KE',{day:'2-digit',month:'short'})+' '+e.d,(e.a<0?'-':'+')+Math.abs(e.a).toLocaleString('en-KE'))});
+  return [(S.name||'').toUpperCase(),'STATEMENT: '+c.name,new Date().toLocaleDateString('en-KE',{dateStyle:'medium'}),'='.repeat(w),...(L.length?L:['No entries yet']),'='.repeat(w),row('BALANCE OWED',ksh(balance(c.id))),...(S.till?['Pay: '+(isPhone()?'M-Pesa send money '+S.till:'Lipa na M-Pesa till '+S.till)]:[]),'Asante!'].join('\n');
+}
+function remindText(c){const lp=lastPay(c.id);return `Hello ${c.name}, this is ${S.name}. Your balance is ${ksh(balance(c.id))}.${lp?' Last payment: '+new Date(lp).toLocaleDateString('en-KE',{dateStyle:'medium'})+'.':''}${S.till?' Please pay by M-Pesa '+(isPhone()?'(send money) to '+S.till:'till '+S.till)+'.':''} Asante!`}
+function renderCust(){
+  const tot=S.customers.reduce((a,c)=>a+Math.max(0,balance(c.id)),0),od=S.customers.filter(c=>overdue(c.id)).length;
+  const wk=S.payments.filter(x=>Date.now()-x.time<7*864e5).reduce((a,x)=>a+x.amount,0);
+  $('custTitle').textContent=tot?`Customers owe you ${ksh(tot)}`:'Customers on credit';
+  $('custStats').innerHTML=`<div class="stat"><b>${ksh(tot)}</b><span>Total owed</span></div><div class="stat"><b>${ksh(wk)}</b><span>Paid in last 7 days</span></div><div class="stat"><b>${od}</b><span>Overdue customers</span></div>`;
+  const list=S.customers.slice().sort((a,b)=>balance(b.id)-balance(a.id));
+  $('custRows').innerHTML=list.length?list.map(c=>{const b=balance(c.id),lp=lastPay(c.id);return `<tr><td><b>${esc(c.name)}</b>${overdue(c.id)?' <span class="tag ref">Overdue</span>':''}</td><td>${esc(c.phone||'—')}</td><td class="n"><b>${ksh(b)}</b></td><td>${lp?new Date(lp).toLocaleDateString('en-KE',{day:'numeric',month:'short'}):'—'}</td><td class="n" style="white-space:nowrap"><button class="link" data-pay="${c.id}">Receive payment</button><button class="link" data-stmt="${c.id}">Statement</button>${c.phone&&b>0?`<a class="link" target="_blank" rel="noopener" href="${waTo(c.phone,remindText(c))}">Remind</a>`:''}<button class="link" data-cdel="${c.id}">Delete</button></td></tr>`}).join(''):'<tr><td colspan="5" class="note">No customers yet. Add one above, or choose Credit when you charge a sale.</td></tr>';
+}
+$('custForm').onsubmit=e=>{e.preventDefault();const n=$('cName').value.trim();if(!n)return;S.customers.push({id:'c'+Date.now(),name:n,phone:$('cPhone').value.trim(),created:Date.now()});save();e.target.reset();renderCust();toast(n+' added')};
+let piC=null,piMethod='Cash';
+function setPi(m){piMethod=m;$('piCash').setAttribute('aria-pressed',m=='Cash');$('piMp').setAttribute('aria-pressed',m=='M-Pesa');$('piCode').style.display=m=='M-Pesa'?'':'none'}
+function updPi(){const v=parseFloat($('piAmt').value)||0;$('piAfter').textContent=ksh(balance(piC.id)-v);$('piGo').disabled=!(v>0)}
+$('custRows').onclick=e=>{
+  const d=e.target.dataset;
+  if(d.pay){piC=custById(d.pay);const b=balance(piC.id);$('piT').textContent='Payment from '+piC.name;$('piInfo').textContent='Owes '+ksh(b);$('piAmt').value='';$('piCode').value='';
+    $('piQuick').innerHTML=[...new Set([b,500,1000,2000,5000].filter(v=>v>0))].slice(0,5).map((v,i)=>`<button class="chip" data-a="${v}">${i==0&&v==b?'Full '+v.toLocaleString('en-KE'):v.toLocaleString('en-KE')}</button>`).join('');
+    setPi('Cash');updPi();$('piM').classList.add('on');$('piAmt').focus()}
+  if(d.stmt){const c=custById(d.stmt);$('stT').textContent='Statement: '+c.name;$('stWa').textContent='Send statement on WhatsApp';const t=stmtText(c);$('stText').textContent=t;$('stWa').href=waTo(c.phone,'```\n'+t+'\n```');$('stM').classList.add('on')}
+  if(d.cdel){const c=custById(d.cdel),b=balance(c.id);ask('Delete '+c.name+'?',b>0?`They still owe ${ksh(b)}. Their sales stay in your records.`:'Their sales stay in your records.','Delete',()=>{S.customers=S.customers.filter(x=>x!==c);save();renderCust()})}
+};
+$('piQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('piAmt').value=a;updPi()}};
+$('piAmt').oninput=updPi;$('piCash').onclick=()=>setPi('Cash');$('piMp').onclick=()=>setPi('M-Pesa');
+$('piNo').onclick=()=>$('piM').classList.remove('on');
+$('piGo').onclick=()=>{const v=Math.round(parseFloat($('piAmt').value)||0);if(!(v>0))return;
+  const x={id:'y'+Date.now(),custId:piC.id,amount:v,method:piMethod,time:Date.now(),by:S.cashier};if(piMethod=='M-Pesa'){const c=$('piCode').value.trim().toUpperCase();if(c)x.code=c}
+  S.payments.push(x);save();$('piM').classList.remove('on');renderCust();
+  const c=piC,msg=`${S.name}: received ${ksh(v)} by ${piMethod} from ${c.name}. Balance now ${ksh(balance(c.id))}. Asante!`;
+  toast(`${ksh(v)} saved. ${c.name} now owes ${ksh(balance(c.id))}`);
+  if(c.phone){$('stT').textContent='Payment saved';$('stText').textContent=msg;$('stWa').textContent='Send confirmation on WhatsApp';$('stWa').href=waTo(c.phone,msg);$('stM').classList.add('on')}
+};
+$('stNo').onclick=()=>$('stM').classList.remove('on');
+$('stCopy').onclick=()=>copy($('stText').textContent,'Statement copied');
+
+/* ---------- products ---------- */
+function renderMenu(){
+  const opts=(list,v)=>list.map(x=>`<option value="${x[0]}"${x[0]==v?' selected':''}>${x[1]}</option>`).join('');
+  const cats=CATS.map(c=>[c,c]),units=[['kg','per kg'],['pc','per piece']];
+  $('aCat').innerHTML=opts(cats,'Beef');
+  $('menuRows').innerHTML=byCat(S.products).map(p=>`<tr data-id="${p.id}"><td><input id="nm-${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Name"></td><td><select id="ct-${p.id}" data-f="cat" aria-label="Category">${opts(cats,p.cat)}</select></td><td><select id="un-${p.id}" data-f="unit" aria-label="Sold by">${opts(units,p.unit)}</select></td><td class="n"><input id="co-${p.id}" data-f="cost" type="number" step="10" min="0" value="${p.cost??''}" placeholder="—" style="width:6.5em" aria-label="Buying price"></td><td class="n"><input id="pr-${p.id}" data-f="price" type="number" step="10" min="0" value="${p.price}" style="width:6.5em" aria-label="Retail price"></td><td class="n"><input id="wp-${p.id}" data-f="wprice" type="number" step="10" min="0" value="${p.wprice||''}" placeholder="${p.price}" style="width:6.5em" aria-label="Wholesale price"></td><td class="n"><input id="st-${p.id}" data-f="stock" type="number" step="0.5" value="${tracked(p)?p.stock:''}" placeholder="—" style="width:6em" aria-label="Stock"></td><td class="n" style="white-space:nowrap"><button class="link" data-si="${p.id}">Stock in</button><button class="link" data-del="${p.id}">Delete</button></td></tr>`).join('');
+  $('siRows').innerHTML=S.stockIns.slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td class="n">${ksh(x.total)}</td><td>${esc(x.supplier||'—')}</td><td>${x.from=='Credit'?'<span class="tag ref">Not paid</span>':esc(x.from=='Cash'?'Drawer':x.from)}</td><td class="n"><button class="link" data-sidel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="7" class="note">No stock received yet. Tap <b>+ Stock in from supplier</b> when meat arrives.</td></tr>';
+}
+$('menuRows').oninput=e=>{
+  const p=prod(e.target.closest('tr').dataset.id),f=e.target.dataset.f;if(!p||!f)return;
+  if(f=='stock'){p.stock=e.target.value===''?null:r3(parseFloat(e.target.value)||0)}
+  else if(f=='wprice'){const v=parseFloat(e.target.value);p.wprice=isNaN(v)||v<=0?null:Math.round(v)}
+  else if(f=='price'){const v=parseFloat(e.target.value);if(isNaN(v))return;p.price=Math.round(v)}
+  else if(f=='cost'){const v=parseFloat(e.target.value);p.cost=isNaN(v)||v<0?null:Math.round(v)}
+  else p[f]=e.target.value;
+  save();
+};
+$('menuRows').onclick=e=>{if(e.target.dataset.si){openSi(e.target.dataset.si);return}const id=e.target.dataset.del;if(!id)return;const p=prod(id);
+  ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
+$('addForm').onsubmit=e=>{e.preventDefault();
+  const name=$('aName').value.trim(),price=parseFloat($('aPrice').value),st=$('aStock').value,wv=parseFloat($('aWprice').value),cv=parseFloat($('aCost').value);if(!name||isNaN(price))return;
+  S.products.push({id:'p'+Date.now(),name,cat:$('aCat').value,unit:$('aUnit').value,price:Math.round(price),wprice:wv>0?Math.round(wv):null,cost:cv>=0?Math.round(cv):null,stock:st===''?null:r3(+st)});save();renderMenu();
+  e.target.reset();$('aName').focus();toast(name+' added')};
+
+/* ---------- settings ---------- */
+const SF={sName:'name',sLoc:'loc',sPhone:'phone',sHours:'hours',sPin:'pin',sTill:'till',sFoot:'footer'};
+function renderSet(){
+  Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);renderStaff();renderCloud();
+  $('bkInfo').textContent=`${S.orders.length} receipt${S.orders.length==1?'':'s'} and ${S.products.length} products on this device.`;
+}
+Object.entries(SF).forEach(([id,k])=>$(id).oninput=e=>{S[k]=e.target.value;save();renderHead()});
+$('sTax').oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0){S.tax=v;save()}};
+$('sPaper').onchange=e=>{S.paper=e.target.value;save();toast('Printer paper set')};
+const ONLINE=!!(window.claude&&window.claude.use);
+$('rcPrint').onclick=()=>{if(!lastOrder)return;
+  if(ONLINE){ask('Print from the computer version','Printing is blocked inside the online page. Open the Silver Meats POS file on your Desktop to print directly, or tap Receipt picture → Save picture and print the picture.','OK',null);return}
+  document.documentElement.dataset.paper=S.paper||'80';try{window.print()}catch(e){toast('Printing is not available here')}};
+function renderStaff(){
+  const isOwner=role(S.cashier)=='Owner';
+  const noPin=S.staff.filter(n=>role(n)!='Cashier'&&!S.pins[n]);
+  $('staffList').innerHTML=`${noPin.length?`<p style="width:100%;margin:0 0 10px;padding:10px 12px;border-radius:10px;background:#fdecee;color:#8e0b20;font-weight:600">Set a PIN for ${noPin.map(esc).join(', ')} — without a PIN, anyone can switch to them and see Sales and Products.</p>`:''}<div class="scroll" style="width:100%"><table><thead><tr><th>Name</th><th>Role</th><th>PIN</th><th></th></tr></thead><tbody>${S.staff.map((n,i)=>`<tr><td><b>${esc(n)}</b>${n==S.cashier?' <small style="color:#c8102e;font-weight:700">(using till now)</small>':''}</td><td><select data-role="${i}" aria-label="Role of ${esc(n)}" ${isOwner?'':'disabled'} style="padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:15px">${ROLES.map(r=>`<option${r==role(n)?' selected':''}>${r}</option>`).join('')}</select></td><td>${role(n)=='Cashier'?'<span class="note">Not needed</span>':`${S.pins[n]?'<span style="color:#1f8f4e;font-weight:700">Set ✓</span>':'<span style="color:#c8102e;font-weight:700">Not set</span>'} ${isOwner||n==S.cashier?`<button type="button" class="link" data-pin="${i}">${S.pins[n]?'Change':'Set PIN'}</button>`:''}`}</td><td class="n">${S.staff.length>1&&isOwner?`<button type="button" data-rmstaff="${i}" aria-label="Remove ${esc(n)}" style="font-weight:800;font-size:18px;padding:0 6px;color:#c8102e">×</button>`:''}</td></tr>`).join('')}</tbody></table></div><p class="note" style="margin:8px 0 0">Owner and Manager see Sales, Products and Settings. Cashiers only see Sell and Customers. Only the Owner can change roles.</p>`;
+}
+$('staffList').onchange=e=>{const i=e.target.dataset.role;if(i==null)return;const n=S.staff[i],r=e.target.value;
+  if(role(n)=='Owner'&&r!='Owner'&&S.staff.filter(x=>role(x)=='Owner').length==1){toast('There must be at least one Owner');renderStaff();return}
+  S.roles[n]=r;if(r=='Cashier')delete S.pins[n];save();renderStaff();applyAccess();toast(n+' is now '+r)};
+$('staffForm').onsubmit=e=>{e.preventDefault();const n=$('sNew').value.trim();if(!n)return;if(S.staff.some(x=>x.toLowerCase()==n.toLowerCase())){toast(n+' is already on the list');return}
+  S.staff.push(n);S.roles[n]='Cashier';save();$('sNew').value='';renderHead();renderStaff();toast(n+' added. Pick them under Cashier at the top.')};
+$('staffList').onclick=e=>{const d=e.target.dataset;
+  if(d.pin!=null){const n=S.staff[d.pin];pinAsk('PIN for '+n,'Type a new 4–6 number PIN for '+n+'. Keep it secret.',async v=>{S.pins[n]=await hashPin(v);save();renderStaff();toast('PIN saved for '+n);return true});return}
+  const i=d.rmstaff;if(i==null)return;const n=S.staff[i];
+  if(role(n)=='Owner'&&S.staff.filter(x=>role(x)=='Owner').length==1){toast('There must be at least one Owner');return}
+  ask('Remove '+n+'?','Their past sales stay in your records.','Remove',()=>{S.staff.splice(i,1);delete S.roles[n];delete S.pins[n];if(!S.staff.includes(S.cashier))S.cashier=S.staff[0];save();renderHead();renderStaff();applyAccess()})};
+$('bkCopy').onclick=()=>copy('SILVERPOS1:'+JSON.stringify(S),'Backup copied. Paste it into WhatsApp or email to keep it safe.');
+$('bkOpen').onclick=()=>{$('bkIn').value='';$('bkErr').textContent='';$('bkM').classList.add('on');$('bkIn').focus()};
+$('bkNo').onclick=()=>$('bkM').classList.remove('on');
+$('bkGo').onclick=()=>{
+  let d;try{d=JSON.parse($('bkIn').value.trim().replace(/^SILVERPOS1:/,''))}catch(e){}
+  if(!d||!Array.isArray(d.products)||!Array.isArray(d.orders)){$('bkErr').textContent='That is not a valid backup. Copy the whole text and try again.';return}
+  $('bkM').classList.remove('on');
+  ask('Replace everything on this device?',`The backup has ${d.orders.length} receipts and ${d.products.length} products.`,'Restore',()=>{S=d;S.v7=1;save();renderHead();renderSet();toast('Backup restored')});
+};
+$('wipe').onclick=()=>ask('Delete all sales?',`${S.orders.length} receipts will be removed from this device. This cannot be undone.`,'Delete all',()=>{S.orders=[];S.held=[];S.cart=[];S.closes={};S.payments=[];save();renderSet();toast('All sales deleted')});
+
+
+/* ---------- roles & PIN ---------- */
+const ROLES=['Owner','Manager','Cashier'];
+if(!S.roles){S.roles={};S.staff.forEach(n=>S.roles[n]=n.toLowerCase()=='owner'?'Owner':'Cashier')}
+if(!S.pins)S.pins={};
+if(!S.staff.some(n=>S.roles[n]=='Owner'))S.roles[S.staff[0]]='Owner';
+const role=n=>S.roles[n]||'Cashier';
+const boss=()=>role(S.cashier)!='Cashier';
+const RESTRICTED=['ord','menu','set'];
+async function hashPin(pin){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('sm2:'+pin));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return 'p:'+pin}}
+let pinCb=null,pinCancel=null;
+function pinAsk(title,text,onOk,onCancel){$('pinT').textContent=title;$('pinP').textContent=text;$('pinIn').value='';$('pinErr').textContent='';pinCb=onOk;pinCancel=onCancel||null;$('pinM').classList.add('on');setTimeout(()=>$('pinIn').focus(),50)}
+$('pinNo').onclick=()=>{$('pinM').classList.remove('on');if(pinCancel)pinCancel()};
+$('pinOk').onclick=async()=>{const v=$('pinIn').value.trim();if(!/^\d{4,6}$/.test(v)){$('pinErr').textContent='Use 4 to 6 numbers.';return}const ok=await pinCb(v);if(ok===false){$('pinErr').textContent='Wrong PIN. Try again.';$('pinIn').value='';$('pinIn').focus();return}$('pinM').classList.remove('on')};
+$('pinIn').onkeydown=e=>{if(e.key=='Enter')$('pinOk').click()};
+function applyAccess(){
+  RESTRICTED.forEach(v=>{const b=document.querySelector(`nav [data-v="${v}"]`);if(b)b.style.display=boss()?'':'none'});
+  $('lockBtn').style.display=boss()&&S.staff.some(n=>role(n)=='Cashier')?'':'none';
+  if(!boss()&&RESTRICTED.some(v=>$(v).classList.contains('on')))show('reg');
+}
+function switchTo(n){S.cashier=n;save();renderHead();applyAccess();if($('reg').classList.contains('on'))renderTicket();if($('set').classList.contains('on'))renderSet()}
+$('cashier').onchange=e=>{const n=e.target.value,prev=S.cashier;
+  if(role(n)!='Cashier'&&S.pins[n]){$('cashier').value=prev;pinAsk(n+' ('+role(n)+')','Enter PIN to switch to '+n+'.',async v=>{if(await hashPin(v)!==S.pins[n])return false;switchTo(n);toast('Now selling as '+n);return true})}
+  else switchTo(n)};
+$('lockBtn').onclick=()=>{const c=S.staff.find(n=>role(n)=='Cashier');if(c){switchTo(c);toast('Locked. Now selling as '+c)}};
+
+
+/* ---------- expenses ---------- */
+const EXCATS=['Rent','Wages','Transport','Electricity & water','Packaging','Supplies','Licence & fees','Other'];
+$('exCat').innerHTML=EXCATS.map(c=>`<option>${c}</option>`).join('');
+$('addExp').onclick=()=>{$('exAmt').value='';$('exNote').value='';$('exDate').value=per=='day'?selDay:dk(Date.now());$('exFrom').value='Cash';$('exM').classList.add('on');$('exAmt').focus()};
+$('exNo').onclick=()=>$('exM').classList.remove('on');
+$('exGo').onclick=()=>{const v=Math.round(parseFloat($('exAmt').value)||0);if(!(v>0)){toast('Type the amount');return}
+  const d=$('exDate').value||dk(Date.now()),t=d==dk(Date.now())?Date.now():+new Date(d+'T12:00');
+  S.expenses.push({id:'e'+Date.now(),time:t,cat:$('exCat').value,amount:v,from:$('exFrom').value,note:$('exNote').value.trim(),by:S.cashier});save();$('exM').classList.remove('on');renderOrders();toast('Expense saved: '+ksh(v))};
+$('perBar').onclick=e=>{const p=e.target.dataset.per;if(p){per=p;renderOrders()}};
+
+/* ---------- stock in ---------- */
+function openSi(id){const list=byCat(S.products);$('siProd').innerHTML=list.map(p=>`<option value="${p.id}"${p.id==id?' selected':''}>${esc(p.name)}</option>`).join('');
+  $('supNames').innerHTML=[...new Set(S.stockIns.map(x=>x.supplier).filter(Boolean))].map(n=>`<option value="${esc(n)}">`).join('');
+  $('siQty').value='';$('siSup').value='';$('siFrom').value='Cash';siFill();$('siM').classList.add('on');$('siQty').focus()}
+function siFill(){const p=prod($('siProd').value);if(!p)return;$('siQL').textContent='Quantity ('+(p.unit=='kg'?'kg':'pieces')+')';$('siCL').textContent='Buying price per '+(p.unit=='kg'?'kg':'piece');$('siCost').value=p.cost??'';siTot()}
+function siTot(){$('siTot').textContent=ksh((parseFloat($('siQty').value)||0)*(parseFloat($('siCost').value)||0))}
+$('siProd').onchange=siFill;$('siQty').oninput=siTot;$('siCost').oninput=siTot;
+$('openSi').onclick=()=>openSi();
+$('siNo').onclick=()=>$('siM').classList.remove('on');
+$('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty').value)||0),c=Math.round(parseFloat($('siCost').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}
+  S.stockIns.push({id:'s'+Date.now(),time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:q,cost:c,total:Math.round(q*c),supplier:$('siSup').value.trim(),from:$('siFrom').value,by:S.cashier});
+  p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;save();$('siM').classList.remove('on');renderMenu();
+  toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
+$('siRows').onclick=e=>{const id=e.target.dataset.sidel;if(!id)return;const x=S.stockIns.find(y=>y.id==id);if(!x)return;
+  ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);save();renderMenu()})};
+
+/* ---------- auto-lock ---------- */
+var lastAct=Date.now();['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},true));
+setInterval(()=>{if(!S.lockMin||!boss()||!S.pins[S.cashier])return;if(Date.now()-lastAct<S.lockMin*60000)return;const c=S.staff.find(n=>role(n)=='Cashier');if(c){switchTo(c);toast('Locked after '+S.lockMin+' minutes without use')}},20000);
+$('sLock').onchange=e=>{S.lockMin=+e.target.value;save();toast(S.lockMin?'Auto-lock after '+S.lockMin+' minutes':'Auto-lock is off')};
+
+/* ---------- cloud backup (online only) ---------- */
+var DB=null,UID=null,cloudTimer=null,cloudBusy=false,cloudLast='';
+function scheduleCloud(){if(!DB||!UID)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>cloudSave(false),60000)}
+function renderCloud(){const box=$('cloudBox');if(!box)return;box.style.display=DB&&UID?'':'none';
+  $('cloudInfo').textContent=(S.cloudAt?'Last cloud backup: '+new Date(S.cloudAt).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})+'. ':'Not backed up to the cloud yet. ')+'It saves by itself about a minute after each change while the online page is open. Only your Claude account can read it.'}
+async function cloudSave(manual){if(!DB||!UID||cloudBusy)return;const j=JSON.stringify(Object.assign({},S,{cloudAt:undefined}));if(!manual&&j===cloudLast)return;cloudBusy=true;
+  try{const N=180000,parts=Math.max(1,Math.ceil(j.length/N)),col=DB.collection('data/users/'+UID);
+    for(let i=0;i<parts;i++)await col.doc('pos_part_'+i).set({s:j.slice(i*N,(i+1)*N)});
+    const old=await col.doc('pos_meta').get(),oldN=old.exists?((old.data()||{}).parts||0):0;
+    await col.doc('pos_meta').set({parts,at:Date.now(),size:j.length,receipts:S.orders.length});
+    for(let i=parts;i<oldN;i++)await col.doc('pos_part_'+i).delete();
+    cloudLast=j;S.cloudAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}renderCloud();if(manual)toast('Backed up to cloud')}
+  catch(e){if(manual)toast('Cloud backup failed: '+((e&&e.message)||(e&&e.code)||e))}finally{cloudBusy=false}}
+async function cloudLoad(){if(!DB||!UID)return;
+  try{const col=DB.collection('data/users/'+UID),m=await col.doc('pos_meta').get();if(!m.exists){toast('No cloud backup for your account yet');return}
+    const md=m.data();let j='';for(let i=0;i<md.parts;i++){const d=await col.doc('pos_part_'+i).get();j+=d.exists?(d.data().s||''):''}
+    const d=JSON.parse(j);if(!d||!Array.isArray(d.products)){toast('Cloud backup is damaged');return}
+    ask('Replace everything on this device?',`Cloud backup from ${new Date(md.at).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})} with ${md.receipts} receipts.`,'Restore',()=>{S=d;S.v7=1;S.cloudAt=md.at;save();renderHead();applyAccess();renderSet();toast('Restored from cloud')})}
+  catch(e){toast('Could not read the cloud backup: '+((e&&e.message)||(e&&e.code)||e))}}
+$('cloudSave').onclick=()=>cloudSave(true);$('cloudLoad').onclick=cloudLoad;
+(async()=>{try{if(window.claude&&window.claude.use){const u=await window.claude.use('user');const db=await window.claude.use('db');if(u&&db){const id=await u.id();if(id){DB=db;UID=id}}}}catch(e){}renderCloud();if(DB&&UID)scheduleCloud()})();
+
+/* ---------- shell ---------- */
+function show(v){
+  if(RESTRICTED.includes(v)&&!boss()){toast('Only the Owner or a Manager can open this');v='reg'}
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==v));
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.v==v));
+  if(v=='reg')renderReg();if(v=='ord')renderOrders();if(v=='menu')renderMenu();if(v=='set')renderSet();if(v=='cust')renderCust();
+}
+document.querySelector('nav').onclick=e=>{const v=e.target.dataset.v;if(v)show(v)};
+$('toastU').onclick=()=>{if(undo)undo();undo=null;$('toast').classList.remove('on')};
+document.addEventListener('keydown',e=>{
+  if(e.key=='Escape')['wM','payM','rcM','zM','bkM','cfM','picM','piM','stM','pinM','exM','siM'].forEach(id=>$(id).classList.remove('on'));
+  if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&$('reg').classList.contains('on')){e.preventDefault();$('q').focus()}
+});
+const tick=()=>$('clock').textContent=new Date().toLocaleString('en-KE',{weekday:'short',hour:'numeric',minute:'2-digit'});
+tick();setInterval(tick,15000);
+if(boss()&&S.pins[S.cashier]){const c=S.staff.find(n=>role(n)=='Cashier');if(c){S.cashier=c;save()}}
+renderHead();applyAccess();renderReg();
+}
+</script>
+<script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}</script>
+</body>
+</html>
