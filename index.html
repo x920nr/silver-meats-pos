@@ -214,6 +214,8 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     </form>
     <p class="note">Changes save as you type. <b>Buying price</b> is what you pay your supplier per kg or piece; it is used to work out your profit. Leave wholesale blank to use the retail price. Leave stock blank if you don't want to count it. Stock goes down with each sale and back up on a refund.</p>
     <div class="scroll"><table><thead><tr><th>Product</th><th>Category</th><th>Sold by</th><th class="n">Buying KSh</th><th class="n">Retail KSh</th><th class="n">Wholesale KSh</th><th class="n">In stock</th><th></th></tr></thead><tbody id="menuRows"></tbody></table></div>
+    <h3 style="margin-top:26px" id="supTitle">Suppliers you owe (deni)</h3>
+    <div class="scroll"><table><thead><tr><th>Supplier</th><th class="n">You owe</th><th>Last payment</th><th></th></tr></thead><tbody id="supRows"></tbody></table></div>
     <h3 style="margin-top:26px">Stock received</h3>
     <div class="scroll"><table><thead><tr><th>Date</th><th>Product</th><th class="n">Qty</th><th class="n">Cost</th><th>Supplier</th><th>Paid from</th><th></th></tr></thead><tbody id="siRows"></tbody></table></div>
   </div></main>
@@ -476,6 +478,23 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   <div class="act" style="padding:12px 0 0;border:0;background:none"><a class="btn" id="alMgr" target="_blank" rel="noopener">Send to Manager</a><a class="btn" id="alOwn" target="_blank" rel="noopener">Send to Owner</a><button class="btn pay sm" style="grid-column:1/-1" id="alOk">OK</button></div>
 </div></div>
 
+<div class="modal" id="spyM" role="dialog" aria-modal="true" aria-labelledby="spyT"><div class="box">
+  <h3 id="spyT">Pay supplier</h3>
+  <p class="note" id="spyInfo" style="margin:0 0 10px"></p>
+  <label for="spyAmt" class="note">Amount paid (KSh)</label>
+  <input id="spyAmt" class="big-in" type="number" min="1" step="10" inputmode="numeric">
+  <div class="quick" id="spyQuick"></div>
+  <div class="form" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:6px 0">
+    <label>Paid from<select id="spyFrom" class="big-in" style="font-size:17px"><option value="Cash">Cash from drawer</option><option value="M-Pesa">M-Pesa</option><option value="Other">Bank / other</option></select></label>
+    <label>M-Pesa code / note<input id="spyNote" class="big-in" maxlength="40" style="font-size:17px"></label>
+  </div>
+  <div class="chg"><span>You will still owe</span><span id="spyAfter"></span></div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="spyNo">Cancel</button>
+    <button class="btn pay sm" id="spyGo">Save payment</button>
+  </div>
+</div></div>
+
 <div class="toast" id="toast"><span id="toastT"></span><button id="toastU">Undo</button></div>
 
 <script>
@@ -529,7 +548,7 @@ save();
 let cat='All',q='',method='Cash',undo=null,lastOrder=null,tt,wItem=null,wMode='kg',wEdit=-1,selDay=dk(Date.now()),cfFn=null,per='day';
 const prod=id=>S.products.find(p=>p.id==id);
 if(!S.mode)S.mode='retail';
-if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
+if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.supPays)S.supPays=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
 const wp=p=>S.mode=='wholesale'&&p.wprice?p.wprice:p.price;
 const inCart=id=>S.cart.filter(l=>l.id==id).reduce((s,l)=>s+l.qty,0);
 function sums(items,disc,tax){
@@ -738,9 +757,10 @@ function report(day,p=per){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<RG.b;
   const kgCat=c=>Object.values(prods).filter(p=>p.cat==c&&p.unit=='kg').reduce((s,p)=>s+p.qty,0);
   const pv=Object.values(prods),costT=pv.reduce((a,x)=>a+x.cost,0),knownT=pv.reduce((a,x)=>a+x.known,0),missingT=pv.reduce((a,x)=>a+x.missing,0),profit=knownT-costT-(sum(paid,o=>o.disc)*(knownT/Math.max(1,knownT+missingT)));
   const exps=S.expenses.filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
+  const sps=(S.supPays||[]).filter(x=>inR(x.time)),supT=sps.reduce((a,x)=>a+x.amount,0),supCash=sps.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.amount,0),supMp=sps.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.amount,0);
   const sins=S.stockIns.filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
   const days={},dd=k=>days[k]=days[k]||{n:0,amt:0,profit:0,exp:0};paid.forEach(o=>{const x=dd(dk(o.time));x.n++;x.amt+=o.total;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});exps.forEach(e=>{dd(dk(e.time)).exp+=e.amount});
-  return {RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
+  return {sps,supT,RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash-supCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp-supMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
 }
 function catGroups(R){
   return CATS.map(c=>{
@@ -764,7 +784,7 @@ function renderOrders(){
   const exRows=R.exps.slice().sort((a,b)=>b.time-a.time).map(e=>`<tr><td style="white-space:nowrap">${new Date(e.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(e.cat)}${e.note?' <span class="note">· '+esc(e.note)+'</span>':''}</td><td>${esc(e.from=='Cash'?'Drawer':e.from)}</td><td class="n">${ksh(e.amount)}</td><td class="n"><button class="link" data-exdel="${e.id}">Delete</button></td></tr>`).join('');
   const dayRows=Object.entries(R.days).sort((a,b)=>a[0]<b[0]?-1:1).map(([k,d])=>`<tr><td><button class="link" data-goday="${k}">${new Date(k+'T12:00').toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})}</button></td><td class="n">${d.n}</td><td class="n">${ksh(d.amt)}</td><td class="n">${ksh(d.profit)}</td><td class="n">${d.exp?ksh(d.exp):'—'}</td><td class="n"><b>${ksh(d.profit-d.exp)}</b></td></tr>`).join('');
   $('ordWrap').innerHTML=`<h2>${R.paid.length?`${ksh(R.net)} from ${R.paid.length} sale${R.paid.length==1?'':'s'} ${when}`:`No sales ${per=='day'?(isToday?'yet today':'on '+R.RG.label):'· '+R.RG.label}`}</h2>
-  <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${st(ksh(R.netProfit),'Net profit (after expenses)',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
+  <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${st(ksh(R.netProfit),'Net profit (after expenses)',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${R.supT?st(ksh(R.supT),'Paid to suppliers (deni)'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
   <div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
   <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}</div>
   <div>${per=='day'?`<h3>Receipts</h3>${R.all.length?`<div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Cashier</th><th>Paid by</th><th class="n">Total</th><th></th></tr></thead><tbody>
@@ -774,7 +794,7 @@ function renderOrders(){
 function zText(day){
   const R=report(day),w=34,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,cl=per=='day'?S.closes[day]:null;
   return [(S.name||'').toUpperCase(),(per=='day'?'END OF DAY REPORT':per=='week'?'WEEKLY REPORT':'MONTHLY REPORT'),R.RG.label,'='.repeat(w),
-    row('Sales',String(R.paid.length)),row('Gross sales',ksh(R.gross)),...(R.disc?[row('Discounts','-'+ksh(R.disc))]:[]),...(R.tax?[row('VAT',ksh(R.tax))]:[]),row('NET TAKINGS',ksh(R.net)),row('Buying cost',ksh(R.costT)),row('PROFIT ON MEAT',ksh(R.profit)),row('Expenses','-'+ksh(R.expT)),row('NET PROFIT',ksh(R.netProfit)),...(R.stockT?[row('Stock bought',ksh(R.stockT))]:[]),...(R.missingT?['(* '+ksh(R.missingT)+' sold without buying price)']:[]),
+    row('Sales',String(R.paid.length)),row('Gross sales',ksh(R.gross)),...(R.disc?[row('Discounts','-'+ksh(R.disc))]:[]),...(R.tax?[row('VAT',ksh(R.tax))]:[]),row('NET TAKINGS',ksh(R.net)),row('Buying cost',ksh(R.costT)),row('PROFIT ON MEAT',ksh(R.profit)),row('Expenses','-'+ksh(R.expT)),row('NET PROFIT',ksh(R.netProfit)),...(R.stockT?[row('Stock bought',ksh(R.stockT))]:[]),...(R.supT?[row('Paid to suppliers',ksh(R.supT))]:[]),...(R.missingT?['(* '+ksh(R.missingT)+' sold without buying price)']:[]),
     ...(R.ref.length?[row('Refunds ('+R.ref.length+')',ksh(R.refAmt))]:[]),'-'.repeat(w),row('Retail',ksh(R.net-R.whole)),row('Wholesale ('+R.wholeN+')',ksh(R.whole)),'-'.repeat(w),row('Cash in drawer',ksh(R.cash)),row('M-Pesa',ksh(R.mp)),...(R.credit?[row('Sold on credit',ksh(R.credit))]:[]),...(R.payCash+R.payMp?[row('Debt paid (in above)',ksh(R.payCash+R.payMp))]:[]),'-'.repeat(w),'SALES BY PRODUCT',
     ...catGroups(R).filter(g=>g.amt>0).flatMap(g=>['',row(g.c.toUpperCase()+' '+gq(g),ksh(g.amt)),...g.rows.filter(r=>r.qty>0).map(r=>row('  '+r.n.slice(0,16)+' '+(r.unit=='kg'?kg(r.qty):r.qty+'pc'),ksh(r.amt)))]),
     ...(R.exps.length?['-'.repeat(w),'EXPENSES',...R.exps.map(e=>row((e.cat+(e.note?' '+e.note:'')).slice(0,22),ksh(e.amount)))]:[]),
@@ -862,7 +882,8 @@ function renderMenu(){
   const cats=CATS.map(c=>[c,c]),units=[['kg','per kg'],['pc','per piece']];
   $('aCat').innerHTML=opts(cats,'Beef');
   $('menuRows').innerHTML=byCat(S.products).map(p=>`<tr data-id="${p.id}"><td><input id="nm-${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Name"></td><td><select id="ct-${p.id}" data-f="cat" aria-label="Category">${opts(cats,p.cat)}</select></td><td><select id="un-${p.id}" data-f="unit" aria-label="Sold by">${opts(units,p.unit)}</select></td><td class="n"><input id="co-${p.id}" data-f="cost" type="number" step="10" min="0" value="${p.cost??''}" placeholder="—" style="width:6.5em" aria-label="Buying price"></td><td class="n"><input id="pr-${p.id}" data-f="price" type="number" step="10" min="0" value="${p.price}" style="width:6.5em" aria-label="Retail price"></td><td class="n"><input id="wp-${p.id}" data-f="wprice" type="number" step="10" min="0" value="${p.wprice||''}" placeholder="${p.price}" style="width:6.5em" aria-label="Wholesale price"></td><td class="n"><input id="st-${p.id}" data-f="stock" type="number" step="0.5" value="${tracked(p)?p.stock:''}" placeholder="—" style="width:6em" aria-label="Stock"></td><td class="n" style="white-space:nowrap"><button class="link" data-si="${p.id}">Stock in</button><button class="link" data-del="${p.id}">Delete</button></td></tr>`).join('');
-  $('siRows').innerHTML=S.stockIns.slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td class="n">${ksh(x.total)}</td><td>${esc(x.supplier||'—')}</td><td>${x.from=='Credit'?'<span class="tag ref">Not paid</span>':esc(x.from=='Cash'?'Drawer':x.from)}</td><td class="n"><button class="link" data-sidel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="7" class="note">No stock received yet. Tap <b>+ Stock in from supplier</b> when meat arrives.</td></tr>';
+  $('siRows').innerHTML=S.stockIns.slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td class="n">${ksh(x.total)}</td><td>${esc(x.supplier||'—')}</td><td>${x.from=='Credit'?(supOwed(x.supplier)>0?`<span class="tag ref">On credit</span> <button class="link" data-supay="${esc(x.supplier||'')}">Pay</button>`:'<span class="tag">Credit · paid</span>'):esc(x.from=='Cash'?'Drawer':x.from)}</td><td class="n"><button class="link" data-sidel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="7" class="note">No stock received yet. Tap <b>+ Stock in from supplier</b> when meat arrives.</td></tr>';
+  renderSup();
 }
 $('menuRows').oninput=e=>{
   const p=prod(e.target.closest('tr').dataset.id),f=e.target.dataset.f;if(!p||!f)return;
@@ -967,7 +988,7 @@ function siTot(){$('siTot').textContent=ksh((parseFloat($('siQty').value)||0)*(p
 $('siProd').onchange=siFill;$('siQty').oninput=siTot;$('siCost').oninput=siTot;
 $('openSi').onclick=()=>openSi();
 $('siNo').onclick=()=>$('siM').classList.remove('on');
-$('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty').value)||0),c=Math.round(parseFloat($('siCost').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}
+$('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty').value)||0),c=Math.round(parseFloat($('siCost').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}if($('siFrom').value=='Credit'&&!$('siSup').value.trim()){toast('Type the supplier name for stock on credit');$('siSup').focus();return}
   S.stockIns.push({id:'s'+Date.now(),time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:q,cost:c,total:Math.round(q*c),supplier:$('siSup').value.trim(),from:$('siFrom').value,by:S.cashier});
   p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;logA('Stock in',p.name+' +'+(p.unit=='kg'?kg(q):q+' pc')+' @ '+ksh(c));save();$('siM').classList.remove('on');renderMenu();
   toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
@@ -1022,7 +1043,7 @@ function mailHref(subject,body){return 'mailto:'+encodeURIComponent(S.email||'')
 function alertItems(){
   const low=S.products.filter(p=>tracked(p)&&p.stock<=(p.unit=='kg'?3:2)).map(p=>({t:'low',p}));
   const od=(S.customers||[]).filter(c=>overdue(c.id)).map(c=>({t:'od',c}));
-  const unpaid=(S.stockIns||[]).filter(x=>x.from=='Credit').map(x=>({t:'sup',x}));
+  const unpaid=supList().filter(r=>r.owed>0).map(r=>({t:'sup',x:{name:r.name||'Unnamed supplier',supplier:'',time:r.lastIn,total:r.owed}}));
   return {low,od,unpaid,n:low.length+od.length+unpaid.length};
 }
 function renderAlertBadge(){const A=alertItems();$('alertN').textContent=A.n;$('alertN').style.display=A.n?'':'none'}
@@ -1034,17 +1055,38 @@ function openAlerts(){const A=alertItems(),h=new Date().getHours();
   $('alBody').innerHTML=A.n?
     sec('⚠️ Low stock — order more',A.low.map(({p})=>row(esc(p.name),p.stock<=0?'OUT':(p.unit=='kg'?kg(p.stock):p.stock+' pc')+' left',p.stock<=0)))+
     sec('💰 Customers overdue (no payment 7+ days)',A.od.map(({c})=>row(esc(c.name)+(c.phone?' · '+esc(c.phone):''),ksh(balance(c.id)),true)))+
-    sec('🚚 Suppliers not paid yet',A.unpaid.map(({x})=>row(esc(x.name)+' · '+esc(x.supplier||'supplier')+' · '+new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'}),ksh(x.total))))
+    sec('🚚 Suppliers you owe (deni)',A.unpaid.map(({x})=>row(esc(x.name),ksh(x.total))))
     :'<p style="font-size:18px">✅ All good: no low stock, no overdue customers, no unpaid suppliers.</p>';
   {const t=alertText();$('alMgr').href=waTo(S.mgrWa,t);$('alMgr').style.display=S.mgrWa?'':'none';$('alOwn').href=waTo(S.ownPhone,t);$('alOwn').style.display=S.ownPhone?'':'none'}
   $('alM').classList.add('on')}
 function alertText(){const A=alertItems(),L=[(S.name||'').toUpperCase()+' — ALERTS '+new Date().toLocaleDateString('en-KE',{day:'numeric',month:'short'})];
   if(A.low.length)L.push('','LOW STOCK:',...A.low.map(({p})=>'- '+p.name+': '+(p.stock<=0?'OUT':(p.unit=='kg'?kg(p.stock):p.stock+' pc')+' left')));
   if(A.od.length)L.push('','OVERDUE CUSTOMERS:',...A.od.map(({c})=>'- '+c.name+': '+ksh(balance(c.id))));
-  if(A.unpaid.length)L.push('','SUPPLIERS NOT PAID:',...A.unpaid.map(({x})=>'- '+x.name+' ('+(x.supplier||'supplier')+'): '+ksh(x.total)));
+  if(A.unpaid.length)L.push('','SUPPLIERS WE OWE:',...A.unpaid.map(({x})=>'- '+x.name+': '+ksh(x.total)));
   if(!A.n)L.push('All good. No alerts.');return L.join('\n')}
 $('alertBtn').onclick=openAlerts;
 $('alOk').onclick=()=>$('alM').classList.remove('on');
+
+
+/* ---------- supplier deni ---------- */
+const supKey=n=>(n||'').trim().toLowerCase();
+function supOwed(name){const k=supKey(name);return (S.stockIns||[]).filter(x=>x.from=='Credit'&&supKey(x.supplier)==k).reduce((a,x)=>a+x.total,0)-(S.supPays||[]).filter(x=>supKey(x.supplier)==k).reduce((a,x)=>a+x.amount,0)}
+function supList(){const m={};(S.stockIns||[]).filter(x=>x.from=='Credit').forEach(x=>{const k=supKey(x.supplier);m[k]=m[k]||{name:x.supplier||'',lastIn:0,lastPay:0};m[k].lastIn=Math.max(m[k].lastIn,x.time)});
+  (S.supPays||[]).forEach(x=>{const k=supKey(x.supplier);if(m[k])m[k].lastPay=Math.max(m[k].lastPay,x.time)});
+  return Object.values(m).map(r=>Object.assign(r,{owed:supOwed(r.name)})).sort((a,b)=>b.owed-a.owed)}
+function renderSup(){const L=supList(),tot=L.reduce((a,r)=>a+Math.max(0,r.owed),0);
+  $('supTitle').textContent=tot?`Suppliers you owe (deni): ${ksh(tot)}`:'Suppliers you owe (deni)';
+  $('supRows').innerHTML=L.length?L.map(r=>`<tr><td><b>${esc(r.name||'Unnamed supplier')}</b></td><td class="n"><b style="color:${r.owed>0?'#c8102e':'inherit'}">${ksh(Math.max(0,r.owed))}</b></td><td>${r.lastPay?new Date(r.lastPay).toLocaleDateString('en-KE',{day:'numeric',month:'short'}):'—'}</td><td class="n" style="white-space:nowrap">${r.owed>0?`<button class="btn pay sm" style="min-height:36px;padding:4px 14px" data-supay="${esc(r.name)}">Pay</button>`:'<span class="tag">Paid up</span>'}</td></tr>`).join(''):'<tr><td colspan="4" class="note">No supplier deni. When meat comes on credit, choose <b>Paid from: Not paid yet</b> in Stock in.</td></tr>'}
+let spyName='';
+function openSupPay(name){spyName=name;const owed=supOwed(name);$('spyT').textContent='Pay '+(name||'unnamed supplier');$('spyInfo').textContent='You owe '+ksh(owed);$('spyAmt').value='';$('spyNote').value='';$('spyFrom').value='Cash';
+  $('spyQuick').innerHTML=[...new Set([owed,1000,5000,10000,20000].filter(v=>v>0&&v<=owed))].slice(0,5).map((v,i)=>`<button class="chip" data-a="${v}">${i==0?'Full '+v.toLocaleString('en-KE'):v.toLocaleString('en-KE')}</button>`).join('');updSpy();$('spyM').classList.add('on');$('spyAmt').focus()}
+function updSpy(){const v=Math.round(parseFloat($('spyAmt').value)||0),owed=supOwed(spyName);$('spyAfter').textContent=ksh(Math.max(0,owed-v));$('spyGo').disabled=!(v>0)||v>owed}
+$('spyAmt').oninput=updSpy;$('spyQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('spyAmt').value=a;updSpy()}};
+$('spyNo').onclick=()=>$('spyM').classList.remove('on');
+$('spyGo').onclick=()=>{const v=Math.round(parseFloat($('spyAmt').value)||0);if(!(v>0))return;
+  S.supPays.push({id:'sp'+Date.now(),time:Date.now(),supplier:spyName,amount:v,from:$('spyFrom').value,note:$('spyNote').value.trim(),by:S.cashier});
+  logA('Supplier paid',spyName+' '+ksh(v)+' ('+$('spyFrom').value+')');save();$('spyM').classList.remove('on');renderMenu();toast(`${ksh(v)} paid to ${spyName||'supplier'}. Still owe ${ksh(supOwed(spyName))}`)};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-supay]');if(b&&$('menu').contains(b))openSupPay(b.dataset.supay)});
 
 /* ---------- shell ---------- */
 function show(v){
@@ -1056,7 +1098,7 @@ function show(v){
 document.querySelector('nav').onclick=e=>{const v=e.target.dataset.v;if(v)show(v)};
 $('toastU').onclick=()=>{if(undo)undo();undo=null;$('toast').classList.remove('on')};
 document.addEventListener('keydown',e=>{
-  if(e.key=='Escape')['wM','payM','rcM','zM','bkM','cfM','picM','piM','stM','pinM','exM','siM','alM'].forEach(id=>$(id).classList.remove('on'));
+  if(e.key=='Escape')['wM','payM','rcM','zM','bkM','cfM','picM','piM','stM','pinM','exM','siM','alM','spyM'].forEach(id=>$(id).classList.remove('on'));
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&$('reg').classList.contains('on')){e.preventDefault();$('q').focus()}
 });
 const tick=()=>$('clock').textContent=new Date().toLocaleString('en-KE',{weekday:'short',hour:'numeric',minute:'2-digit'});
