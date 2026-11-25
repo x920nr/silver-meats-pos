@@ -308,12 +308,21 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   <h3 id="payT">Take payment</h3>
   <div class="due" id="due"></div>
   <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="custName" class="big-in" maxlength="40" placeholder="e.g. John" autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label><p class="note" style="grid-column:1/-1;margin:0;font-size:13px">Only save a phone number if the customer agrees.</p></div>
-  <div class="tabs" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="chip" id="mCash" aria-pressed="true">Cash</button><button class="chip" id="mMp" aria-pressed="false">M-Pesa</button><button class="chip" id="mCr" aria-pressed="false">Credit</button></div>
+  <div class="tabs" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button class="chip" id="mCash" aria-pressed="true">Cash</button><button class="chip" id="mMp" aria-pressed="false">M-Pesa</button><button class="chip" id="mSp" aria-pressed="false">Cash + M-Pesa</button><button class="chip" id="mCr" aria-pressed="false">Credit</button></div>
   <div id="cashBox">
     <label for="tend" class="note">Cash received (KSh)</label>
     <input id="tend" class="big-in" type="number" step="10" min="0" inputmode="numeric">
     <div class="quick" id="quick"></div>
     <div class="chg"><span>Change</span><span id="chg">KSh 0</span></div>
+  </div>
+  <div id="spBox" style="display:none">
+    <div class="form" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px">
+      <label>M-Pesa amount<input id="spMp" class="big-in" type="number" min="0" step="10" inputmode="numeric" style="font-size:18px"></label>
+      <label>Cash amount<input id="spCash" class="big-in" type="number" min="0" step="10" inputmode="numeric" style="font-size:18px"></label>
+      <label class="wide">M-Pesa code (optional)<input id="spCode" class="big-in" maxlength="12" placeholder="e.g. SKL4H7XQ2P" style="font-size:17px;text-transform:uppercase"></label>
+    </div>
+    <p class="note" style="margin:0">Type the M-Pesa amount; the cash amount fills in by itself. Change it if the customer gives more cash.</p>
+    <div class="chg"><span id="spLbl">Still to pay</span><span id="spRem">KSh 0</span></div>
   </div>
   <div id="mpBox" style="display:none">
     <p class="note" id="mpTill" style="margin-top:0"></p>
@@ -631,14 +640,17 @@ $('held').onclick=e=>{const i=e.target.dataset.recall;if(i==null)return;
   const h=S.held.splice(i,1)[0];S.cart=h.cart;S.disc=h.disc;S.mode=h.mode||'retail';save();renderReg()};
 
 /* ---------- payment & receipt ---------- */
-function setMethod(m){method=m;$('mCash').setAttribute('aria-pressed',m=='Cash');$('mMp').setAttribute('aria-pressed',m=='M-Pesa');$('mCr').setAttribute('aria-pressed',m=='Credit');$('cashBox').style.display=m=='Cash'?'':'none';$('mpBox').style.display=m=='M-Pesa'?'':'none';$('crBox').style.display=m=='Credit'?'':'none';$('custBox').style.display=m=='Credit'?'none':'grid';updChange()}
-function updChange(){
+function setMethod(m){method=m;$('mCash').setAttribute('aria-pressed',m=='Cash');$('mMp').setAttribute('aria-pressed',m=='M-Pesa');$('mSp').setAttribute('aria-pressed',m=='Split');$('mCr').setAttribute('aria-pressed',m=='Credit');$('cashBox').style.display=m=='Cash'?'':'none';$('mpBox').style.display=m=='M-Pesa'?'':'none';$('spBox').style.display=m=='Split'?'':'none';$('crBox').style.display=m=='Credit'?'':'none';$('custBox').style.display=m=='Credit'?'none':'grid';updChange()}
+function updSplit(){const T=sums(S.cart,S.disc,S.tax),mp=Math.round(parseFloat($('spMp').value)||0),ca=Math.round(parseFloat($('spCash').value)||0),diff=mp+ca-T.total;
+  $('spLbl').textContent=diff<0?'Still to pay':'Change (cash)';$('spRem').textContent=ksh(Math.abs(diff));$('spRem').style.color=diff<0?'#c8102e':'';
+  const ok=mp>0&&ca>0&&mp<=T.total&&diff>=0;$('payDone').disabled=!ok;$('payDone').textContent='Complete'}
+function updChange(){if(method=='Split'){updSplit();return}
   const T=sums(S.cart,S.disc,S.tax),v=parseFloat($('tend').value)||0,c=v-T.total,cv=$('crCust').value,ok=method=='M-Pesa'||(method=='Credit'?(cv&&cv!='new')||(cv=='new'&&$('crName').value.trim()):(!v||c>=0));
   $('chg').textContent=method=='Cash'&&v?(c>=0?ksh(c):'Short '+ksh(-c)):'KSh 0';
   $('payDone').disabled=!ok;$('payDone').textContent=method=='M-Pesa'?'M-Pesa received':method=='Credit'?'Add to account':'Complete';
 }
 $('charge').onclick=()=>{
-  const T=sums(S.cart,S.disc,S.tax);$('due').textContent=ksh(T.total);$('tend').value='';$('mpCode').value='';$('custName').value='';$('custPh').value='';
+  const T=sums(S.cart,S.disc,S.tax);$('due').textContent=ksh(T.total);$('tend').value='';$('mpCode').value='';$('spMp').value='';$('spCash').value='';$('spCash').dataset.auto='1';$('spCode').value='';$('custName').value='';$('custPh').value='';
   $('mpTill').textContent=S.till?(isPhone()?`Customer sends ${ksh(T.total)} by M-Pesa (Send Money) to ${S.till}.`:`Customer pays ${ksh(T.total)} to till / paybill ${S.till}.`):`Customer pays ${ksh(T.total)} by M-Pesa. Add your M-Pesa number in Settings.`;
   const qs=[T.total,Math.ceil(T.total/50)*50,Math.ceil(T.total/100)*100,Math.ceil(T.total/500)*500,Math.ceil(T.total/1000)*1000];
   $('quick').innerHTML=[...new Set(qs)].slice(0,5).map((v,i)=>`<button class="chip" data-t="${v}">${i?v.toLocaleString('en-KE'):'Exact'}</button>`).join('');
@@ -647,6 +659,9 @@ $('charge').onclick=()=>{
 $('quick').onclick=e=>{const t=e.target.dataset.t;if(t){$('tend').value=t;updChange()}};
 $('tend').oninput=updChange;
 $('custName').oninput=()=>{const c=S.customers.find(x=>x.name.toLowerCase()==$('custName').value.trim().toLowerCase())||S.orders.slice().reverse().find(o=>o.customer&&o.custPhone&&o.customer.toLowerCase()==$('custName').value.trim().toLowerCase());const ph=c&&(c.phone||c.custPhone);if(ph&&!$('custPh').value)$('custPh').value=ph};
+$('mSp').onclick=()=>{setMethod('Split');$('spMp').focus()};
+$('spMp').oninput=()=>{const T=sums(S.cart,S.disc,S.tax),mp=Math.round(parseFloat($('spMp').value)||0);if($('spCash').dataset.auto){$('spCash').value=mp>0&&mp<T.total?T.total-mp:''}updSplit()};
+$('spCash').oninput=()=>{$('spCash').dataset.auto=$('spCash').value===''?'1':'';updSplit()};
 $('mCash').onclick=()=>setMethod('Cash');$('mMp').onclick=()=>setMethod('M-Pesa');$('mCr').onclick=()=>setMethod('Credit');
 $('payCancel').onclick=()=>$('payM').classList.remove('on');
 const moveStock=(o,sign)=>o.items.forEach(l=>{const p=prod(l.id);if(p&&tracked(p))p.stock=r3(p.stock+sign*l.qty)});
@@ -655,8 +670,9 @@ $('payDone').onclick=()=>{
   const o={no:S.next++,time:Date.now(),items:S.cart.map(l=>({...l})),sub:T.sub,disc:T.d,discPct:S.disc,tax:T.t,taxPct:S.tax,total:T.total,method,status:'Paid',cashier:S.cashier,mode:S.mode};
   if(method!='Credit'){const c=$('custName').value.trim(),ph=$('custPh').value.trim();if(c)o.customer=c;if(ph)o.custPhone=ph}
   if(method=='Cash'){o.tendered=parseFloat($('tend').value)||o.total;o.change=o.tendered-o.total}
+  else if(method=='Split'){const mp=Math.round(parseFloat($('spMp').value)||0),ca=Math.round(parseFloat($('spCash').value)||0);o.split={mp,cash:o.total-mp,given:ca};o.change=ca-(o.total-mp);const c=$('spCode').value.trim().toUpperCase();if(c)o.code=c}
   else if(method=='M-Pesa')o.code=$('mpCode').value.trim().toUpperCase();
-  else{o.custId=cr.id;o.customer=cr.name}
+  else if(method=='Credit'){o.custId=cr.id;o.customer=cr.name}
   moveStock(o,-1);S.orders.push(o);if(o.disc)logA('Discount given','Receipt #'+o.no+' '+o.discPct+'% = '+ksh(o.disc));S.cart=[];S.disc=0;save();
   $('payM').classList.remove('on');openReceipt(o);renderReg();
 };
@@ -666,14 +682,14 @@ function receiptText(o){
   return [c((S.name||'').toUpperCase()),...head().flatMap(h=>wrapT(h,w)).map(c),'-'.repeat(w),'Receipt #'+o.no,new Date(o.time).toLocaleString('en-KE'),...(o.cashier?['Served by '+o.cashier]:[]),...(o.mode=='wholesale'?['WHOLESALE SALE']:[]),...(o.customer&&o.method!='Credit'?['Customer: '+o.customer]:[]),'-'.repeat(w),
     ...o.items.flatMap(l=>[l.name.slice(0,w),row('  '+qtyTxt(l)+' x '+l.price,ksh(l.amt))]),'-'.repeat(w),row('Subtotal',ksh(o.sub)),
     ...(o.disc?[row('Discount '+o.discPct+'%','-'+ksh(o.disc))]:[]),...(o.tax?[row('VAT '+o.taxPct+'%',ksh(o.tax))]:[]),row('TOTAL',ksh(o.total)),
-    ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:[row('Paid '+o.method,ksh(o.tendered||o.total))]),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
+    ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:(o.method=='Split'?[row('Paid M-Pesa',ksh(o.split.mp)),row('Paid Cash',ksh(o.split.given))]:[row('Paid '+o.method,ksh(o.tendered||o.total))])),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
     ...(S.till?wrapT(mpLine(),w).map(c):[]),'',o.status=='Refunded'?c('*** REFUNDED ***'):c(S.footer||''),...(S.privRc?wrapT('Your details are used only for receipts and credit. Ask us to delete them.',w).map(c):[])].join('\n');
 }
 function openReceipt(o){
   lastOrder=o;
   $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(S.name)}</h2>${head().map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
     linesHTML(o.items,false)+totHTML({sub:o.sub,d:o.disc,pct:o.discPct,t:o.tax,tp:o.taxPct,total:o.total})+
-    `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
+    `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:(o.method=='Split'?`<div><span>Paid · M-Pesa</span><span>${ksh(o.split.mp)}</span></div><div><span>Paid · Cash</span><span>${ksh(o.split.given)}</span></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`)}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
     `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>${S.privRc?'<p class="hd" style="margin-top:6px;font-size:11px">Your details are used only for receipts and credit. Ask us to delete them.</p>':''}`;
   $('rcPhone').value=o.custPhone||'';$('rcName').value=o.customer||'';$('rcName').disabled=o.method=='Credit';updWa();
   $('rcM').classList.add('on');
@@ -724,7 +740,7 @@ function report(day,p=per){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<RG.b;
   const exps=S.expenses.filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
   const sins=S.stockIns.filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
   const days={},dd=k=>days[k]=days[k]||{n:0,amt:0,profit:0,exp:0};paid.forEach(o=>{const x=dd(dk(o.time));x.n++;x.amt+=o.total;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});exps.forEach(e=>{dd(dk(e.time)).exp+=e.amount});
-  return {RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid.filter(o=>o.method=='Cash'),o=>o.total)+payCash-expCash-stockCash,mp:sum(paid.filter(o=>o.method=='M-Pesa'),o=>o.total)+payMp-expMp-stockMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
+  return {RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
 }
 function catGroups(R){
   return CATS.map(c=>{
@@ -752,7 +768,7 @@ function renderOrders(){
   <div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
   <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}</div>
   <div>${per=='day'?`<h3>Receipts</h3>${R.all.length?`<div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Cashier</th><th>Paid by</th><th class="n">Total</th><th></th></tr></thead><tbody>
-  ${R.all.slice().reverse().map(o=>`<tr><td>${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}">View</button>${o.status=='Paid'?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
+  ${R.all.slice().reverse().map(o=>`<tr><td>${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method=='Split'?'Cash + M-Pesa':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}">View</button>${o.status=='Paid'?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
   </tbody></table></div>`:'<p class="note">No receipts for this day.</p>'}`:`<h3>Day by day</h3>${dayRows?`<div class="scroll"><table><thead><tr><th>Day</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Profit</th><th class="n">Expenses</th><th class="n">Net</th></tr></thead><tbody>${dayRows}</tbody></table></div><p class="note">Tap a day to open it.</p>`:'<p class="note">No sales in this period.</p>'}`}</div></div>`;
 }
 function zText(day){
