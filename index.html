@@ -290,7 +290,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 <div class="modal" id="payM" role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box">
   <h3 id="payT">Take payment</h3>
   <div class="due" id="due"></div>
-  <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="cust" class="big-in" maxlength="40" list="custNames" placeholder="e.g. John" autocomplete="off" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label><datalist id="custNames"></datalist></div>
+  <div id="custBox" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px"><label class="note" style="display:grid;gap:4px">Customer name (optional)<input id="custName" class="big-in" maxlength="40" placeholder="e.g. John" autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:17px"></label><label class="note" style="display:grid;gap:4px">Phone (optional)<input id="custPh" class="big-in" maxlength="16" inputmode="tel" placeholder="07…" style="font-size:17px"></label></div>
   <div class="tabs" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="chip" id="mCash" aria-pressed="true">Cash</button><button class="chip" id="mMp" aria-pressed="false">M-Pesa</button><button class="chip" id="mCr" aria-pressed="false">Credit</button></div>
   <div id="cashBox">
     <label for="tend" class="note">Cash received (KSh)</label>
@@ -307,7 +307,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   <div id="crBox" style="display:none">
     <label for="crCust" class="note">Customer (pays later)</label>
     <select id="crCust" class="big-in" style="font-size:18px"></select>
-    <div id="crNew" style="display:none;margin-top:8px"><input id="crName" class="big-in" maxlength="40" placeholder="New customer name" style="font-size:18px;margin-bottom:8px"><input id="crPhone" class="big-in" maxlength="16" inputmode="tel" placeholder="Phone (for reminders)" style="font-size:18px"></div>
+    <div id="crNew" style="display:none;margin-top:8px"><input id="crName" class="big-in" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="New customer name" style="font-size:18px;margin-bottom:8px"><input id="crPhone" class="big-in" maxlength="16" inputmode="tel" placeholder="Phone (for reminders)" style="font-size:18px"></div>
     <p class="note" id="crInfo"></p>
   </div>
   <div class="act" style="padding:0;border:0;background:none">
@@ -319,7 +319,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 <div class="modal" id="rcM" role="dialog" aria-modal="true" aria-label="Receipt"><div class="box" style="background:var(--soft)">
   <div class="paper" id="rcPaper"></div>
   <label for="rcName" class="note" style="display:block;margin-top:14px">Customer name on this receipt</label>
-  <input id="rcName" class="big-in" maxlength="40" placeholder="Type name, then press Enter" style="font-size:18px;margin-bottom:8px">
+  <input id="rcName" class="big-in" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Type name, then press Enter" style="font-size:18px;margin-bottom:8px">
   <label for="rcPhone" class="note" style="display:block">Customer WhatsApp number</label>
   <input id="rcPhone" class="big-in" inputmode="tel" maxlength="16" placeholder="e.g. 0712 345 678" style="font-size:18px">
   <div class="act" style="padding:10px 0 0;border:0;background:none">
@@ -608,7 +608,7 @@ function updChange(){
   $('payDone').disabled=!ok;$('payDone').textContent=method=='M-Pesa'?'M-Pesa received':method=='Credit'?'Add to account':'Complete';
 }
 $('charge').onclick=()=>{
-  const T=sums(S.cart,S.disc,S.tax);$('due').textContent=ksh(T.total);$('tend').value='';$('mpCode').value='';$('cust').value='';$('custPh').value='';$('custNames').innerHTML=[...new Set([...S.customers.map(c=>c.name),...S.orders.slice(-300).map(o=>o.customer).filter(Boolean)])].map(n=>`<option value="${esc(n)}">`).join('');
+  const T=sums(S.cart,S.disc,S.tax);$('due').textContent=ksh(T.total);$('tend').value='';$('mpCode').value='';$('custName').value='';$('custPh').value='';
   $('mpTill').textContent=S.till?(isPhone()?`Customer sends ${ksh(T.total)} by M-Pesa (Send Money) to ${S.till}.`:`Customer pays ${ksh(T.total)} to till / paybill ${S.till}.`):`Customer pays ${ksh(T.total)} by M-Pesa. Add your M-Pesa number in Settings.`;
   const qs=[T.total,Math.ceil(T.total/50)*50,Math.ceil(T.total/100)*100,Math.ceil(T.total/500)*500,Math.ceil(T.total/1000)*1000];
   $('quick').innerHTML=[...new Set(qs)].slice(0,5).map((v,i)=>`<button class="chip" data-t="${v}">${i?v.toLocaleString('en-KE'):'Exact'}</button>`).join('');
@@ -616,14 +616,14 @@ $('charge').onclick=()=>{
 };
 $('quick').onclick=e=>{const t=e.target.dataset.t;if(t){$('tend').value=t;updChange()}};
 $('tend').oninput=updChange;
-$('cust').oninput=()=>{const c=S.customers.find(x=>x.name.toLowerCase()==$('cust').value.trim().toLowerCase())||S.orders.slice().reverse().find(o=>o.customer&&o.custPhone&&o.customer.toLowerCase()==$('cust').value.trim().toLowerCase());const ph=c&&(c.phone||c.custPhone);if(ph&&!$('custPh').value)$('custPh').value=ph};
+$('custName').oninput=()=>{const c=S.customers.find(x=>x.name.toLowerCase()==$('custName').value.trim().toLowerCase())||S.orders.slice().reverse().find(o=>o.customer&&o.custPhone&&o.customer.toLowerCase()==$('custName').value.trim().toLowerCase());const ph=c&&(c.phone||c.custPhone);if(ph&&!$('custPh').value)$('custPh').value=ph};
 $('mCash').onclick=()=>setMethod('Cash');$('mMp').onclick=()=>setMethod('M-Pesa');$('mCr').onclick=()=>setMethod('Credit');
 $('payCancel').onclick=()=>$('payM').classList.remove('on');
 const moveStock=(o,sign)=>o.items.forEach(l=>{const p=prod(l.id);if(p&&tracked(p))p.stock=r3(p.stock+sign*l.qty)});
 $('payDone').onclick=()=>{
   const T=sums(S.cart,S.disc,S.tax);let cr=null;if(method=='Credit'){cr=crCustomer();if(!cr)return}
   const o={no:S.next++,time:Date.now(),items:S.cart.map(l=>({...l})),sub:T.sub,disc:T.d,discPct:S.disc,tax:T.t,taxPct:S.tax,total:T.total,method,status:'Paid',cashier:S.cashier,mode:S.mode};
-  if(method!='Credit'){const c=$('cust').value.trim(),ph=$('custPh').value.trim();if(c)o.customer=c;if(ph)o.custPhone=ph}
+  if(method!='Credit'){const c=$('custName').value.trim(),ph=$('custPh').value.trim();if(c)o.customer=c;if(ph)o.custPhone=ph}
   if(method=='Cash'){o.tendered=parseFloat($('tend').value)||o.total;o.change=o.tendered-o.total}
   else if(method=='M-Pesa')o.code=$('mpCode').value.trim().toUpperCase();
   else{o.custId=cr.id;o.customer=cr.name}
