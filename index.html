@@ -238,7 +238,10 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
       <div class="form">
         <label>Shop name<input id="sName" maxlength="40"></label>
         <label>Location<input id="sLoc" maxlength="120" placeholder="e.g. Kahawa West, Nairobi"></label>
-        <label>Phone<input id="sPhone" maxlength="20" inputmode="tel" placeholder="e.g. 0712 345 678"></label>
+        <label>Shop phone (on receipts)<input id="sPhone" maxlength="20" inputmode="tel" placeholder="e.g. 0712 345 678"></label>
+        <label>Owner phone / WhatsApp<input id="sOwnPh" maxlength="16" inputmode="tel" placeholder="07…"></label>
+        <label>Manager phone<input id="sMgrPh" maxlength="16" inputmode="tel" placeholder="07…"></label>
+        <label>Manager WhatsApp<input id="sMgrWa" maxlength="16" inputmode="tel" placeholder="07…"></label>
         <label>Opening hours<input id="sHours" maxlength="60" placeholder="e.g. Open 6:00 AM – 4:00 PM"></label>
         <label>KRA PIN (optional)<input id="sPin" maxlength="15" style="text-transform:uppercase"></label>
         <label>M-Pesa number (till, paybill or phone)<input id="sTill" maxlength="20" inputmode="numeric"></label>
@@ -352,6 +355,8 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     <button class="btn" id="zCopy">Copy report</button>
     <a class="btn" id="zWa" target="_blank" rel="noopener">Send on WhatsApp</a>
     <a class="btn" id="zMail">Send by email</a>
+    <a class="btn" id="zOwn" target="_blank" rel="noopener">WhatsApp to Owner</a>
+    <a class="btn" id="zMgr" target="_blank" rel="noopener">WhatsApp to Manager</a>
     <button class="btn" id="zBack">Back</button>
     <button class="btn pay sm" id="zClose">Close the day</button>
   </div>
@@ -459,7 +464,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   <h3 id="alT">Good morning</h3>
   <p class="note" id="alDate" style="margin:0 0 10px"></p>
   <div id="alBody"></div>
-  <div class="act" style="padding:12px 0 0;border:0;background:none"><button class="btn pay sm" style="grid-column:1/-1" id="alOk">OK</button></div>
+  <div class="act" style="padding:12px 0 0;border:0;background:none"><a class="btn" id="alMgr" target="_blank" rel="noopener">Send to Manager</a><a class="btn" id="alOwn" target="_blank" rel="noopener">Send to Owner</a><button class="btn pay sm" style="grid-column:1/-1" id="alOk">OK</button></div>
 </div></div>
 
 <div class="toast" id="toast"><span id="toastT"></span><button id="toastU">Undo</button></div>
@@ -506,6 +511,7 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(ty
 function logA(a,d){if(!S.log)S.log=[];S.log.push({t:Date.now(),by:S.cashier||'',a,d:d||''});if(S.log.length>3000)S.log.splice(0,S.log.length-3000)}
 if(!S.phone)S.phone='0794 506 667';
 if(S.hours==null)S.hours='Open 6:00 AM – 4:00 PM';
+
 if(!S.v8){[['goat','Goat meat','Goat',750],['camel','Camel meat','Camel',700],['fish','Fish','Fish',900]].forEach(([id,name,cat,price])=>{if(!S.products.some(p=>p.name.toLowerCase()==name.toLowerCase()))S.products.push({id,name,cat,unit:'kg',price,stock:null})});S.v8=1}
 if(!S.v9){const W={"whole chicken": 300, "boneless breast": 400, "legs": 300, "drumsticks": 400, "wings": 300, "thighs": 220, "gizzards": 250, "chicken liver": 120, "neck": 120, "kata": 100, "chicken feet": 70, "beef": 550, "beef mince": 550, "goat meat": 750, "camel meat": 680, "fish": 900};S.products.forEach(p=>{const v=W[p.name.toLowerCase()];if(v!=null&&!p.wprice)p.wprice=v});S.v9=1}
 if(!S.till)S.till='0794 506 667';
@@ -762,7 +768,7 @@ function zText(day){
     cl?'Closed by '+cl.by+' at '+hm(cl.at):'Printed '+new Date().toLocaleString('en-KE')].join('\n');
 }
 function openZ(){
-  $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));$('zMail').href=mailHref((S.name||'Shop')+' — '+(per=='day'?'End of day':per=='week'?'Week':'Month')+' report — '+report(selDay).RG.label,zText(selDay));
+  $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));{const zt='```\n'+zText(selDay)+'\n```';$('zOwn').href=waTo(S.ownPhone,zt);$('zOwn').style.display=S.ownPhone?'':'none';$('zMgr').href=waTo(S.mgrWa,zt);$('zMgr').style.display=S.mgrWa?'':'none'}$('zMail').href=mailHref((S.name||'Shop')+' — '+(per=='day'?'End of day':per=='week'?'Week':'Month')+' report — '+report(selDay).RG.label,zText(selDay));
   $('zClose').style.display=per!='day'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
 }
 $('closeDay').onclick=openZ;
@@ -861,7 +867,7 @@ $('addForm').onsubmit=e=>{e.preventDefault();
   logA('Product added',name+' '+ksh(price));save();e.target.reset();$('aName').focus();toast(name+' added')};
 
 /* ---------- settings ---------- */
-const SF={sName:'name',sLoc:'loc',sPhone:'phone',sHours:'hours',sPin:'pin',sTill:'till',sFoot:'footer'};
+const SF={sName:'name',sLoc:'loc',sPhone:'phone',sOwnPh:'ownPhone',sMgrPh:'mgrPhone',sMgrWa:'mgrWa',sHours:'hours',sPin:'pin',sTill:'till',sFoot:'footer'};
 function renderSet(){
   Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);$('sEmail').value=S.email||'';renderStaff();renderCloud();renderLog();renderPriv();
   $('bkInfo').textContent=`${S.orders.length} receipt${S.orders.length==1?'':'s'} and ${S.products.length} products on this device.`;
@@ -1014,7 +1020,13 @@ function openAlerts(){const A=alertItems(),h=new Date().getHours();
     sec('💰 Customers overdue (no payment 7+ days)',A.od.map(({c})=>row(esc(c.name)+(c.phone?' · '+esc(c.phone):''),ksh(balance(c.id)),true)))+
     sec('🚚 Suppliers not paid yet',A.unpaid.map(({x})=>row(esc(x.name)+' · '+esc(x.supplier||'supplier')+' · '+new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'}),ksh(x.total))))
     :'<p style="font-size:18px">✅ All good: no low stock, no overdue customers, no unpaid suppliers.</p>';
+  {const t=alertText();$('alMgr').href=waTo(S.mgrWa,t);$('alMgr').style.display=S.mgrWa?'':'none';$('alOwn').href=waTo(S.ownPhone,t);$('alOwn').style.display=S.ownPhone?'':'none'}
   $('alM').classList.add('on')}
+function alertText(){const A=alertItems(),L=[(S.name||'').toUpperCase()+' — ALERTS '+new Date().toLocaleDateString('en-KE',{day:'numeric',month:'short'})];
+  if(A.low.length)L.push('','LOW STOCK:',...A.low.map(({p})=>'- '+p.name+': '+(p.stock<=0?'OUT':(p.unit=='kg'?kg(p.stock):p.stock+' pc')+' left')));
+  if(A.od.length)L.push('','OVERDUE CUSTOMERS:',...A.od.map(({c})=>'- '+c.name+': '+ksh(balance(c.id))));
+  if(A.unpaid.length)L.push('','SUPPLIERS NOT PAID:',...A.unpaid.map(({x})=>'- '+x.name+' ('+(x.supplier||'supplier')+'): '+ksh(x.total)));
+  if(!A.n)L.push('All good. No alerts.');return L.join('\n')}
 $('alertBtn').onclick=openAlerts;
 $('alOk').onclick=()=>$('alM').classList.remove('on');
 
