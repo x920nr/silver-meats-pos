@@ -195,6 +195,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
       <span class="row" id="perBar" role="group" aria-label="Report period" style="gap:4px"><button class="chip" data-per="day" aria-pressed="true">Day</button><button class="chip" data-per="week" aria-pressed="false">Week</button><button class="chip" data-per="month" aria-pressed="false">Month</button></span>
       <span id="closedPill"></span><span class="sp"></span>
       <button class="btn" id="addExp">+ Expense</button>
+      <button class="btn" id="xlsBtn" type="button" title="Download this report as an Excel file">⬇ Excel</button>
       <button class="btn pay sm" id="closeDay">End of day report</button>
     </div>
     <div id="ordWrap"></div>
@@ -559,7 +560,6 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(ty
 function logA(a,d){if(!S.log)S.log=[];S.log.push({t:Date.now(),by:S.cashier||'',a,d:d||''});if(S.log.length>3000)S.log.splice(0,S.log.length-3000)}
 if(!S.phone)S.phone='0794 506 667';
 if(S.hours==null)S.hours='Open 6:00 AM – 4:00 PM';
-
 if(!S.v8){[['goat','Goat meat','Goat',750],['camel','Camel meat','Camel',700],['fish','Fish','Fish',900]].forEach(([id,name,cat,price])=>{if(!S.products.some(p=>p.name.toLowerCase()==name.toLowerCase()))S.products.push({id,name,cat,unit:'kg',price,stock:null})});S.v8=1}
 if(!S.v9){const W={"whole chicken": 300, "boneless breast": 400, "legs": 300, "drumsticks": 400, "wings": 300, "thighs": 220, "gizzards": 250, "chicken liver": 120, "neck": 120, "kata": 100, "chicken feet": 70, "beef": 550, "beef mince": 550, "goat meat": 750, "camel meat": 680, "fish": 900};S.products.forEach(p=>{const v=W[p.name.toLowerCase()];if(v!=null&&!p.wprice)p.wprice=v});S.v9=1}
 if(!S.till)S.till='0794 506 667';
@@ -835,6 +835,77 @@ function openZ(){
   $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));{const zt='```\n'+zText(selDay)+'\n```';$('zOwn').href=waTo(S.ownPhone,zt);$('zOwn').style.display=S.ownPhone?'':'none';$('zMgr').href=waTo(S.mgrWa,zt);$('zMgr').style.display=S.mgrWa?'':'none'}$('zMail').href=mailHref((S.name||'Shop')+' — '+(per=='day'?'End of day':per=='week'?'Week':'Month')+' report — '+report(selDay).RG.label,zText(selDay));
   $('zClose').style.display=per!='day'||VIEW!='local'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
 }
+
+/* ---------- Excel export (SheetJS, loaded only when needed) ---------- */
+function loadXLSX(){if(window.XLSX)return Promise.resolve();return new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>window.XLSX?res():rej(new Error('Excel tool did not load'));sc.onerror=()=>rej(new Error('Could not load the Excel tool. Check the internet and try again.'));document.head.appendChild(sc)})}
+function excelBook(){const R=report(selDay),src=SRC(),RG=R.RG,inR=t=>t>=RG.a&&t<RG.b;
+  const brNm=b=>(BRANCHES.find(x=>x.id==b)||{}).name||(b?b:(S.name||''));
+  const scope=VIEW=='local'?(S.name||'This till'):VIEW=='all'?'All branches':brNm(VIEW);
+  const kind=per=='day'?'Day':per=='week'?'Week':'Month';
+  const d=t=>new Date(t).toLocaleDateString('en-KE',{year:'numeric',month:'2-digit',day:'2-digit'}),tm=t=>new Date(t).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'});
+  const payLbl=o=>o.status=='Refunded'?'Refunded':o.method=='Split'?'Cash + M-Pesa':o.method;
+  const sheets=[],pays=(src.payments||[]).filter(x=>inR(x.time));
+  // Summary
+  const sum=[[(VIEW=='all'?'SILVER MEATS – ALL BRANCHES':scope).toUpperCase()],[kind+' report',RG.label],['Made',new Date().toLocaleString('en-KE')],[],['Item','KSh'],
+    ['Sales (number)',R.paid.length],['Gross sales',R.gross],['Discounts',-R.disc],['VAT',R.tax],['NET TAKINGS',R.net],[],
+    ['Cash in drawer',R.cash],['M-Pesa',R.mp],['Sold on credit (deni)',R.credit],['Debt payments received',R.payCash+R.payMp],[],
+    ['Buying cost of meat sold',R.costT],['Profit on meat',R.profit],['Expenses',-R.expT],['NET PROFIT',R.netProfit],[],
+    ['Stock bought',R.stockT],['Paid to suppliers (deni)',R.supT],['Retail sales',R.net-R.whole],['Wholesale sales',R.whole],['Refunds',R.refAmt],
+    ...(R.missingT?[[],['Note: sales without a buying price (profit not counted)',R.missingT]]:[])];
+  if(VIEW=='all'){sum.push([],['BRANCH','Sales','KSh','Cash','M-Pesa','Credit','Profit']);BRANCHES.forEach(b=>{const x=R.byBr[b.id]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};sum.push([b.name+' – '+b.short,x.n,x.net,x.cash,x.mp,x.credit,x.profit])})}
+  sheets.push(['Summary',sum,[34,16,14,14,14,14,14]]);
+  // Customers: who bought, what they took, how they paid, credit owed
+  {const CU={},key=n=>(n||'').trim().toLowerCase();
+   const cFind=n=>(S.customers||[]).find(y=>key(y.name)==key(n));
+   R.paid.forEach(o=>{const nm=(o.customer||'').trim()||'Walk-in (no name)',k=key(nm)||'~walkin';const c=CU[k]=CU[k]||{nm,n:0,tot:0,cash:0,mp:0,cr:0,items:{},paid:0};
+     c.n++;c.tot+=o.total;if(o.method=='Credit')c.cr+=o.total;else if(o.method=='M-Pesa')c.mp+=o.total;else if(o.method=='Split'){const m=+(o.split&&o.split.mp)||0;c.mp+=m;c.cash+=o.split&&o.split.cash!=null?+o.split.cash:o.total-m}else c.cash+=o.total;
+     o.items.forEach(l=>{const u=l.unit=='kg'?'kg':'pc',ik=l.name+'|'+u,x=c.items[ik]=c.items[ik]||{n:l.name,u,q:0};x.q+=+l.qty||0})});
+   pays.forEach(x=>{const cc=(S.customers||[]).find(y=>y.id==x.custId);if(!cc)return;const k=key(cc.name);const c=CU[k]=CU[k]||{nm:cc.name,n:0,tot:0,cash:0,mp:0,cr:0,items:{},paid:0};c.paid+=x.amount});
+   (S.customers||[]).forEach(cc=>{const k=key(cc.name);if(!CU[k]&&balance(cc.id)>0)CU[k]={nm:cc.name,n:0,tot:0,cash:0,mp:0,cr:0,items:{},paid:0}});
+   const cs=[['Customer','Phone','Receipts','What they took','Total bought','Paid cash','Paid M-Pesa','Took on credit (deni)','Paid back on deni','CREDIT OWED NOW']];
+   const list=Object.values(CU).sort((a,b)=>a.nm.startsWith('Walk-in')?1:b.nm.startsWith('Walk-in')?-1:b.tot-a.tot);let T=[0,0,0,0,0,0];
+   list.forEach(c=>{const cc=cFind(c.nm),owe=cc?balance(cc.id):'';const took=Object.values(c.items).map(x=>x.n+' '+(x.u=='kg'?(+x.q.toFixed(3))+'kg':x.q+'pc')).join(', ');
+     cs.push([c.nm,cc&&cc.phone||'',c.n,took,c.tot,c.cash,c.mp,c.cr,c.paid,owe]);T[0]+=c.tot;T[1]+=c.cash;T[2]+=c.mp;T[3]+=c.cr;T[4]+=c.paid;T[5]+=+owe||0});
+   cs.push(['TOTAL','','','',...T]);
+   sheets.push(['Customers',cs,[22,13,9,50,12,11,12,14,13,15]])}
+
+  // Products
+  const pr=[['Category','Product','Quantity','Unit','Sales KSh','Profit KSh']];catGroups(R).forEach(g=>{g.rows.filter(r=>r.qty>0).forEach(r=>pr.push([g.c,r.n,+(+r.qty).toFixed(3),r.unit=='kg'?'kg':'pc',r.amt,r.profit==null?'':r.profit]));if(g.amt)pr.push([g.c+' total','','','',g.amt,g.profit])});
+  sheets.push(['Products',pr,[12,22,10,6,12,12]]);
+  // Days (week / month)
+  if(per!='day'){const dy=[['Date','Sales','KSh','Profit','Expenses','Net']];Object.entries(R.days).sort((a,b)=>a[0]<b[0]?-1:1).forEach(([k,x])=>dy.push([k,x.n,x.amt,x.profit,x.exp,x.profit-x.exp]));sheets.push(['Days',dy,[12,8,12,12,12,12]])}
+  // Receipts
+  const rc=[['Date','Time','Branch','Receipt','Cashier','Customer','Paid by','Type','Items','Subtotal','Discount','VAT','Total','Status','M-Pesa code']];
+  R.all.slice().sort((a,b)=>a.time-b.time).forEach(o=>rc.push([d(o.time),tm(o.time),brNm(o.br),o.no,o.cashier||'',o.customer||'',payLbl(o),o.mode=='wholesale'?'Wholesale':'Retail',o.items.map(l=>l.name+' '+(l.unit=='kg'?(+l.qty).toFixed(3)+'kg':l.qty+'pc')).join(', '),o.sub,o.disc||0,o.tax||0,o.total,o.status,o.code||'']));
+  sheets.push(['Receipts',rc,[11,7,16,8,12,16,13,10,40,10,9,7,10,9,13]]);
+  // Items
+  const it=[['Date','Branch','Receipt','Product','Quantity','Unit','Price','Amount','Buying cost','Profit']];
+  R.paid.slice().sort((a,b)=>a.time-b.time).forEach(o=>o.items.forEach(l=>{const c=lineCost(l);it.push([d(o.time),brNm(o.br),o.no,l.name,+(+l.qty).toFixed(3),l.unit=='kg'?'kg':'pc',l.price,l.amt,c==null?'':Math.round(c),c==null?'':Math.round(l.amt-c)])}));
+  sheets.push(['Items sold',it,[11,16,8,20,10,6,9,10,11,10]]);
+  // Expenses
+  const ex=[['Date','Branch','Type','Note','Paid from','KSh']];R.exps.slice().sort((a,b)=>a.time-b.time).forEach(e=>ex.push([d(e.time),brNm(e.br),e.cat,e.note||'',e.from=='Cash'?'Drawer':e.from,e.amount]));ex.push(['Total','','','','',R.expT]);
+  sheets.push(['Expenses',ex,[11,16,18,26,12,10]]);
+  // Stock in + supplier payments
+  const si=[['Date','Branch','Product','Quantity','Unit','Cost each','Total','Supplier','Paid from']];R.sins.slice().sort((a,b)=>a.time-b.time).forEach(x=>si.push([d(x.time),brNm(x.br),x.name,x.qty,x.unit=='kg'?'kg':'pc',x.cost,x.total,x.supplier||'',x.from=='Credit'?'Not paid (deni)':x.from=='Cash'?'Drawer':x.from]));
+  sheets.push(['Stock in',si,[11,16,20,9,6,10,10,16,15]]);
+  const sp=[['Date','Branch','Supplier','KSh','Paid from','Note']];R.sps.slice().sort((a,b)=>a.time-b.time).forEach(x=>sp.push([d(x.time),brNm(x.br),x.supplier||'',x.amount,x.from=='Cash'?'Drawer':x.from,x.note||'']));
+  sheets.push(['Supplier payments',sp,[11,16,18,10,12,20]]);
+  // Debt payments from customers
+  const dp=[['Date','Branch','Customer','KSh','Paid by','M-Pesa code']];
+  pays.sort((a,b)=>a.time-b.time).forEach(x=>{const c=(S.customers||[]).find(y=>y.id==x.custId);dp.push([d(x.time),brNm(x.br),c?c.name:'',x.amount,x.method,x.code||''])});
+  sheets.push(['Customer payments',dp,[11,16,20,10,10,13]]);
+  const wb=XLSX.utils.book_new();sheets.forEach(([n,rows,w])=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,n)});
+  const fname=('Silver Meats '+scope.replace(/^Silver Meats /,'')+' '+kind+' '+RG.label).replace(/[^\w\- –,]+/g,'').replace(/\s+/g,' ').trim()+'.xlsx';
+  return {wb,fname}}
+$('xlsBtn').onclick=async()=>{const b=$('xlsBtn');b.disabled=true;const old=b.textContent;b.textContent='Making Excel…';
+  try{if(VIEW!='local'&&REMOTE.loading){toast('Wait for branch sales to load');return}await loadXLSX();const {wb,fname}=excelBook();
+    const data=XLSX.write(wb,{bookType:'xlsx',type:'array'}),blob=new Blob([data],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    logA('Excel report',fname);save();
+    if(typeof DL!='undefined'&&DL){try{await DL.save({filename:fname,data:blob});toast('Excel saved')}catch(e){if(!(e&&e.code=='declined'))toast('Could not save: '+((e&&e.message)||(e&&e.code)))}return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Excel saved to Downloads: '+fname)}
+  catch(e){toast(navigator.onLine===false?'No internet — the Excel tool needs internet the first time':String(e.message||e))}
+  finally{b.disabled=false;b.textContent=old}};
+
 $('closeDay').onclick=openZ;
 $('zBack').onclick=()=>$('zM').classList.remove('on');
 $('zCopy').onclick=()=>copy(zText(selDay),'Report copied');
