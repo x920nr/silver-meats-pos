@@ -243,10 +243,11 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
         <label>Sync status<span id="syncInfo" style="color:var(--ink);font-weight:600;padding:8px 0"></span></label>
         <label>Database project ID<input id="fbProj" autocomplete="off" placeholder="from Firebase setup"></label>
         <label>Database web key<input id="fbKey" autocomplete="off" placeholder="from Firebase setup"></label>
-        <label>Shop login email<input id="fbEmail" type="email" autocomplete="username" placeholder="shop email"></label>
-        <label>Shop login password<input id="fbPass" type="password" autocomplete="current-password" placeholder="password (not saved)"></label>
+        <label>Shop login email<input id="fbEmail" type="email" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="shop email"></label>
+        <label>Shop login password<input id="fbPass" type="password" autocomplete="new-password" placeholder="password (not saved)"></label>
       </div>
       <div class="row" style="margin-top:12px"><button class="btn pay sm" id="fbIn" type="button">Sign in &amp; start sync</button><button class="btn" id="fbSync" type="button">Sync now</button><button class="btn" id="fbOut" type="button">Sign out</button></div>
+      <div class="row" style="margin-top:10px;align-items:center"><input id="fbCode" placeholder="Paste setup code from the owner" autocomplete="off" spellcheck="false" style="flex:1 1 240px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:44px"><button class="btn" id="fbUse" type="button">Use setup code</button><button class="btn" id="fbShare" type="button">Share setup with a branch</button></div>
     </div>
     <div class="card">
       <h3>Receipt details</h3>
@@ -1176,11 +1177,11 @@ function renderBrBar(){const show=fbOn()&&boss();$('brBar').style.display=show?'
 $('brBar').onclick=e=>{const v=e.target.dataset.vw;if(v){VIEW=v;renderOrders()}};
 function renderSyncDot(){const d=$('syncDot');if(!fbOn()||!S.branch){d.textContent='';return}const pend=S.syncDel.length||SYNC_COLLS.some(c=>(S[c]||[]).some(r=>S.syncH[c+'/'+docId(c,r)]!==hashS(JSON.stringify(r))));
   d.textContent=S.syncErr?'⚠️ not synced':pend?'☁️ sending…':'☁️ synced';d.title=S.syncErr||(S.syncAt?'Last sync '+hm(S.syncAt):'')}
-function renderSyncInfo(){const b=BRANCHES.find(x=>x.id==S.branch);
+function renderSyncInfo(){const b=BRANCHES.find(x=>x.id==S.branch);if(typeof ONLINE!='undefined'&&ONLINE){$('syncInfo').textContent='Sync works in the laptop app and phone app, not on this online page.';return}
   $('syncInfo').textContent=!S.branch?'Choose a branch first':!fbOn()?'Not signed in — sales stay on this device':S.syncErr?'⚠️ '+S.syncErr:'✅ On — '+(b?b.name:'')+(S.syncAt?' · last sync '+hm(S.syncAt):'');}
 function renderSyncSet(){$('sBranch').innerHTML='<option value="">— choose branch —</option>'+BRANCHES.map(b=>`<option value="${b.id}"${b.id==S.branch?' selected':''}>${esc(b.name)} – ${esc(b.short)}</option>`).join('');
   $('fbProj').value=S.fbProj||'';$('fbKey').value=S.fbKey||'';$('fbEmail').value=(S.fbAuth&&S.fbAuth.email)||S.fbEmail||'';$('fbPass').value='';
-  const owner=role(S.cashier)=='Owner';['sBranch','fbProj','fbKey','fbEmail','fbPass','fbIn','fbOut'].forEach(i=>$(i).disabled=!owner);renderSyncInfo()}
+  const owner=role(S.cashier)=='Owner';['sBranch','fbProj','fbKey','fbEmail','fbPass','fbIn','fbOut','fbCode','fbUse','fbShare'].forEach(i=>$(i).disabled=!owner);renderSyncInfo()}
 $('sBranch').onchange=e=>{const b=BRANCHES.find(x=>x.id==e.target.value);if(!b){S.branch='';save();renderSyncSet();return}
   ask('This till is at '+b.name+'?',`Receipts will show "${b.name}" and "${b.loc}". All sales on this device will be counted for ${b.name}.`,'Yes',()=>{S.branch=b.id;S.name=b.name;S.loc=b.loc;S.orders.forEach(o=>{if(!o.br)o.br=b.id});logA('Branch set',b.name);save();renderHead();renderSet();toast('This till is now '+b.name)});renderSyncSet()};
 $('fbProj').onchange=e=>{S.fbProj=e.target.value.trim();save()};$('fbKey').onchange=e=>{S.fbKey=e.target.value.trim();save()};
@@ -1190,6 +1191,13 @@ $('fbIn').onclick=async()=>{const {key}=fbCfg(),email=$('fbEmail').value.trim(),
     const j=await r.json();if(!r.ok)throw new Error(((j.error&&j.error.message)||'Sign-in failed').replace(/_/g,' ').toLowerCase());
     S.fbAuth={email,refresh:j.refreshToken,uid:j.localId};FBT={tok:j.idToken,exp:Date.now()+(+j.expiresIn||3600)*1000};$('fbPass').value='';logA('Sync signed in',email);save();renderSyncSet();toast('Signed in. Syncing…');syncNow(true)}
   catch(e){toast('Sign-in: '+(navigator.onLine===false?'no internet':e.message))}finally{$('fbIn').disabled=role(S.cashier)!='Owner'}};
+const setupCode=()=>'SMSETUP:'+btoa(JSON.stringify({p:S.fbProj||'',k:S.fbKey||'',e:(S.fbAuth&&S.fbAuth.email)||S.fbEmail||''}))+':END';
+$('fbShare').onclick=()=>{if(!S.fbProj||!S.fbKey){toast('Set up sync on this laptop first');return}
+  const t='Silver Meats till – setup code\n\n'+setupCode()+'\n\nOn the branch phone: open the Silver Meats app → Settings → Branch & sync → paste this code in "Paste setup code" → Use setup code. Then choose the branch and type the till password (ask the owner).';
+  $('stPhBox').style.display='none';$('stT').textContent='Setup code for a branch';$('stText').textContent=t;$('stWa').textContent='Send setup code on WhatsApp';$('stWa').href=wa(t);$('stM').classList.add('on')};
+$('fbUse').onclick=()=>{const m=($('fbCode').value||'').match(/SMSETUP:([A-Za-z0-9+/=]+):END/);if(!m){toast('That is not a setup code. Copy the whole code starting with SMSETUP:');return}
+  let d;try{d=JSON.parse(atob(m[1]))}catch(e){toast('Setup code is damaged. Ask the owner to send it again.');return}
+  if(!d.p||!d.k){toast('Setup code is incomplete');return}S.fbProj=d.p;S.fbKey=d.k;if(d.e)S.fbEmail=d.e;$('fbCode').value='';logA('Sync setup code used',d.p);save();renderSyncSet();toast('Setup code saved. Now choose the branch and sign in.')};
 $('fbSync').onclick=()=>syncNow(true);
 $('fbOut').onclick=()=>ask('Stop syncing on this device?','Sales stay on this device. Sign in again to send them.','Sign out',()=>{S.fbAuth=null;FBT={tok:'',exp:0};logA('Sync signed out','');save();renderSyncSet();renderSyncDot()});
 setInterval(()=>{if(fbOn()&&S.branch)syncNow()},60000);addEventListener('online',()=>syncSoon());
