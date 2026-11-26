@@ -206,7 +206,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     <div class="row" id="pbBar" style="display:none;margin-bottom:14px;gap:6px;align-items:center"></div>
     <div id="pbWrap" style="display:none"></div>
     <div id="menuLocal">
-    <div class="row" style="margin-bottom:14px"><button class="btn pay sm" id="openSi" type="button">+ Stock in from supplier</button></div>
+    <div class="row" style="margin-bottom:14px"><button class="btn pay sm" id="openSi" type="button">+ Stock in from supplier</button><button class="btn" id="openWs" type="button">− Waste / loss</button><button class="btn" id="openCn" type="button">✓ Count stock</button></div>
     <form class="add" id="addForm">
       <label class="wide">Product<input id="aName" required maxlength="40" placeholder="e.g. Goat meat"></label>
       <label>Category<select id="aCat"></select></label>
@@ -223,6 +223,8 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     <div class="scroll"><table><thead><tr><th>Supplier</th><th class="n">You owe</th><th>Last payment</th><th></th></tr></thead><tbody id="supRows"></tbody></table></div>
     <h3 style="margin-top:26px">Stock received</h3>
     <div class="scroll"><table><thead><tr><th>Date</th><th>Product</th><th class="n">Qty</th><th class="n">Cost</th><th>Supplier</th><th>Paid from</th><th></th></tr></thead><tbody id="siRows"></tbody></table></div>
+    <h3 style="margin-top:26px">Waste and loss recorded</h3>
+    <div class="scroll"><table><thead><tr><th>Date</th><th>Product</th><th class="n">Qty</th><th>Reason</th><th class="n">Value KSh</th><th></th></tr></thead><tbody id="wsRows"></tbody></table></div>
     </div>
   </div></main>
 
@@ -492,6 +494,32 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
   </div>
 </div></div>
 
+<div class="modal" id="wsM" role="dialog" aria-modal="true" aria-labelledby="wsT"><div class="box">
+  <h3 id="wsT">Record waste or loss</h3>
+  <p class="note" style="margin:0 0 8px">Meat that is thrown away, spoiled, cut off as bones and fat, or missing. It is taken off stock.</p>
+  <div class="form" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 6px">
+    <label class="wide">Product<select id="wsProd" class="big-in" style="font-size:17px"></select></label>
+    <label><span id="wsQL">Quantity (kg)</span><input id="wsQty" class="big-in" type="number" min="0" step="0.1" inputmode="decimal" style="font-size:17px"></label>
+    <label>Reason<select id="wsWhy" class="big-in" style="font-size:17px"><option>Bones and fat</option><option>Spoiled / bad</option><option>Weight loss (drying)</option><option>Missing</option><option>Given free</option><option>Other</option></select></label>
+    <label class="wide">Note (optional)<input id="wsNote" class="big-in" maxlength="60" style="font-size:17px"></label>
+  </div>
+  <div class="chg"><span>Value at buying price</span><span id="wsTot">KSh 0</span></div>
+  <div class="act" style="padding:0;border:0;background:none">
+    <button class="btn" id="wsNo">Cancel</button>
+    <button class="btn pay sm" id="wsGo">Save</button>
+  </div>
+</div></div>
+
+<div class="modal" id="cnM" role="dialog" aria-modal="true" aria-labelledby="cnT"><div class="box wide">
+  <h3 id="cnT">Count stock</h3>
+  <p class="note" style="margin:0 0 8px">Weigh or count what is really in the shop and type it. Leave a box empty to skip that product. If there is less than the till expects, the difference is saved as <b>Missing (stock count)</b>.</p>
+  <div class="scroll" style="max-height:55vh"><table><thead><tr><th>Product</th><th class="n">Till says</th><th class="n">Real count</th><th class="n">Difference</th></tr></thead><tbody id="cnRows"></tbody></table></div>
+  <div class="act" style="padding:12px 0 0;border:0;background:none">
+    <button class="btn" id="cnNo">Cancel</button>
+    <button class="btn pay sm" id="cnGo">Save count</button>
+  </div>
+</div></div>
+
 <div class="modal" id="alM" role="dialog" aria-modal="true" aria-labelledby="alT"><div class="box wide">
   <h3 id="alT">Good morning</h3>
   <p class="note" id="alDate" style="margin:0 0 10px"></p>
@@ -568,7 +596,7 @@ save();
 let cat='All',q='',method='Cash',undo=null,lastOrder=null,tt,wItem=null,wMode='kg',wEdit=-1,selDay=dk(Date.now()),cfFn=null,per='day';
 const prod=id=>S.products.find(p=>p.id==id);
 if(!S.mode)S.mode='retail';
-if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.supPays)S.supPays=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(S.lockMin==null)S.lockMin=5;
+if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.supPays)S.supPays=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(!S.wastes)S.wastes=[];if(S.lockMin==null)S.lockMin=5;
 const wp=p=>S.mode=='wholesale'&&p.wprice?p.wprice:p.price;
 const inCart=id=>S.cart.filter(l=>l.id==id).reduce((s,l)=>s+l.qty,0);
 function sums(items,disc,tax){
@@ -781,9 +809,14 @@ function report(day,p=per,src=SRC()){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<R
   const exps=(src.expenses||[]).filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
   const sps=(src.supPays||[]).filter(x=>inR(x.time)),supT=sps.reduce((a,x)=>a+x.amount,0),supCash=sps.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.amount,0),supMp=sps.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.amount,0);
   const sins=(src.stockIns||[]).filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
+  const wastes=(src.wastes||[]).filter(x=>inR(x.time)),wasteT=wastes.reduce((a,x)=>a+(x.value||0),0);
+  const LS={},lk=n=>(n||'').trim().toLowerCase(),lg=(n,u)=>LS[lk(n)]=LS[lk(n)]||{n:(n||'').trim(),unit:u,bought:0,sold:0,lost:0,value:0,why:{}};
+  sins.forEach(x=>{lg(x.name,x.unit).bought+=x.qty});paid.forEach(o=>o.items.forEach(l=>{lg(l.name,l.unit).sold+=+l.qty||0}));
+  wastes.forEach(x=>{const r=lg(x.name,x.unit);r.lost+=x.qty;r.value+=x.value||0;r.why[x.reason]=(r.why[x.reason]||0)+x.qty});
+  const loss=Object.values(LS).filter(r=>r.lost||r.bought).sort((a,b)=>b.value-a.value||b.bought-a.bought);
   const days={},dd=k=>days[k]=days[k]||{n:0,amt:0,profit:0,exp:0};paid.forEach(o=>{const x=dd(dk(o.time));x.n++;x.amt+=o.total;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});exps.forEach(e=>{dd(dk(e.time)).exp+=e.amount});
   const byBr={};paid.forEach(o=>{const b=o.br||'?',x=byBr[b]=byBr[b]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};x.n++;x.net+=o.total;x.cash+=o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0;x.mp+=o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0;x.credit+=o.method=='Credit'?o.total:0;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});
-  return {byBr,sps,supT,RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash-supCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp-supMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
+  return {byBr,sps,supT,RG,exps,expT,expCash,sins,stockT,stockCash,days,wastes,wasteT,loss,netProfit:profit-expT-wasteT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash-supCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp-supMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
 }
 function catGroups(R){
   return CATS.map(c=>{
@@ -811,9 +844,9 @@ function renderOrders(){
   const brTable=remote&&VIEW=='all'?`<h3>Branches</h3><div class="scroll" style="margin-bottom:18px"><table><thead><tr><th>Branch</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Cash</th><th class="n">M-Pesa</th><th class="n">Credit</th><th class="n">Profit</th></tr></thead><tbody>${BRANCHES.map(b=>{const x=R.byBr[b.id]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};return `<tr><td><button class="link" data-vw="${b.id}">${esc(b.name)}</button> <span class="note">${esc(b.short)}</span></td><td class="n">${x.n}</td><td class="n"><b>${ksh(x.net)}</b></td><td class="n">${ksh(x.cash)}</td><td class="n">${ksh(x.mp)}</td><td class="n">${ksh(x.credit)}</td><td class="n">${ksh(x.profit)}</td></tr>`}).join('')}</tbody></table></div>`:'';
   const remoteNote=remote?`<p class="note" style="margin:-8px 0 14px">${REMOTE.loading?'⏳ Loading branch sales…':REMOTE.err?'⚠️ '+esc(REMOTE.err):'Branch sales from the online database · updated '+(REMOTE.at?hm(REMOTE.at):'—')} <button class="link" id="rfRemote">Refresh</button></p>`:'';
   $('ordWrap').innerHTML=`${remoteNote}<h2>${remote?esc(VIEW=='all'?'All branches':brName(VIEW))+': ':''}${R.paid.length?`${ksh(R.net)} from ${R.paid.length} sale${R.paid.length==1?'':'s'} ${when}`:`No sales ${per=='day'?(isToday?'yet today':'on '+R.RG.label):'· '+R.RG.label}`}</h2>
-  <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${st(ksh(R.netProfit),'Net profit (after expenses)',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${R.supT?st(ksh(R.supT),'Paid to suppliers (deni)'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
+  <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${R.wasteT?st(ksh(R.wasteT),'Meat lost (waste)','#c8102e'):''}${st(ksh(R.netProfit),'Net profit (after expenses'+(R.wasteT?' and waste':'')+')',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${R.supT?st(ksh(R.supT),'Paid to suppliers (deni)'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
   ${brTable}<div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
-  <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}</div>
+  <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}${lossTable(R)}</div>
   <div>${per=='day'?`<h3>Receipts</h3>${R.all.length?`<div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Cashier</th><th>Paid by</th><th class="n">Total</th><th></th></tr></thead><tbody>
   ${R.all.slice().sort((a,b)=>b.time-a.time).map(o=>`<tr><td>${remote?'<span class="note">'+esc(brName(o.br))+'</span> ':''}${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method=='Split'?'Cash + M-Pesa':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}" data-vid="${esc(o.id||'')}">View</button>${o.status=='Paid'&&!remote?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
   </tbody></table></div>`:'<p class="note">No receipts for this day.</p>'}`:`<h3>Day by day</h3>${dayRows?`<div class="scroll"><table><thead><tr><th>Day</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Profit</th><th class="n">Expenses</th><th class="n">Net</th></tr></thead><tbody>${dayRows}</tbody></table></div><p class="note">Tap a day to open it.</p>`:'<p class="note">No sales in this period.</p>'}`}</div></div>`;
@@ -850,7 +883,7 @@ function excelBook(){const R=report(selDay),src=SRC(),RG=R.RG,inR=t=>t>=RG.a&&t<
     ['Sales (number)',R.paid.length],['Gross sales',R.gross],['Discounts',-R.disc],['VAT',R.tax],['NET TAKINGS',R.net],[],
     ['Cash in drawer',R.cash],['M-Pesa',R.mp],['Sold on credit (deni)',R.credit],['Debt payments received',R.payCash+R.payMp],[],
     ['Buying cost of meat sold',R.costT],['Profit on meat',R.profit],['Expenses',-R.expT],['NET PROFIT',R.netProfit],[],
-    ['Stock bought',R.stockT],['Paid to suppliers (deni)',R.supT],['Retail sales',R.net-R.whole],['Wholesale sales',R.whole],['Refunds',R.refAmt],
+    ['Meat lost (waste, at buying price)',-R.wasteT],['Stock bought',R.stockT],['Paid to suppliers (deni)',R.supT],['Retail sales',R.net-R.whole],['Wholesale sales',R.whole],['Refunds',R.refAmt],
     ...(R.missingT?[[],['Note: sales without a buying price (profit not counted)',R.missingT]]:[])];
   if(VIEW=='all'){sum.push([],['BRANCH','Sales','KSh','Cash','M-Pesa','Credit','Profit']);BRANCHES.forEach(b=>{const x=R.byBr[b.id]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};sum.push([b.name+' – '+b.short,x.n,x.net,x.cash,x.mp,x.credit,x.profit])})}
   sheets.push(['Summary',sum,[34,16,14,14,14,14,14]]);
@@ -887,6 +920,8 @@ function excelBook(){const R=report(selDay),src=SRC(),RG=R.RG,inR=t=>t>=RG.a&&t<
   sheets.push(['Expenses',ex,[11,16,18,26,12,10]]);
   // Stock in + supplier payments
   const si=[['Date','Branch','Product','Quantity','Unit','Cost each','Total','Supplier','Paid from']];R.sins.slice().sort((a,b)=>a.time-b.time).forEach(x=>si.push([d(x.time),brNm(x.br),x.name,x.qty,x.unit=='kg'?'kg':'pc',x.cost,x.total,x.supplier||'',x.from=='Credit'?'Not paid (deni)':x.from=='Cash'?'Drawer':x.from]));
+  {const ml=[['Product','Unit','Bought','Sold','Lost','Loss %','KSh lost']];R.loss.forEach(r=>ml.push([r.n,r.unit=='kg'?'kg':'pc',+r.bought.toFixed(3),+r.sold.toFixed(3),+r.lost.toFixed(3),r.bought?+(r.lost/r.bought*100).toFixed(1):'',r.value]));ml.push([],['Date','Branch','Product','Quantity','Unit','Reason','Note','KSh','By']);
+   R.wastes.slice().sort((a,b)=>a.time-b.time).forEach(x=>ml.push([d(x.time),brNm(x.br),x.name,x.qty,x.unit=='kg'?'kg':'pc',x.reason,x.note||'',x.value||0,x.by||'']));sheets.push(['Meat loss',ml,[20,6,10,10,10,9,12,12,10]])}
   sheets.push(['Stock in',si,[11,16,20,9,6,10,10,16,15]]);
   const sp=[['Date','Branch','Supplier','KSh','Paid from','Note']];R.sps.slice().sort((a,b)=>a.time-b.time).forEach(x=>sp.push([d(x.time),brNm(x.br),x.supplier||'',x.amount,x.from=='Cash'?'Drawer':x.from,x.note||'']));
   sheets.push(['Supplier payments',sp,[11,16,18,10,12,20]]);
@@ -983,6 +1018,7 @@ function renderMenu(){try{renderPbBar()}catch(e){}
   $('aCat').innerHTML=opts(cats,'Beef');
   $('menuRows').innerHTML=byCat(S.products).map(p=>`<tr data-id="${p.id}"><td><input id="nm-${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Name"></td><td><select id="ct-${p.id}" data-f="cat" aria-label="Category">${opts(cats,p.cat)}</select></td><td><select id="un-${p.id}" data-f="unit" aria-label="Sold by">${opts(units,p.unit)}</select></td><td class="n"><input id="co-${p.id}" data-f="cost" type="number" step="10" min="0" value="${p.cost??''}" placeholder="—" style="width:6.5em" aria-label="Buying price"></td><td class="n"><input id="pr-${p.id}" data-f="price" type="number" step="10" min="0" value="${p.price}" style="width:6.5em" aria-label="Retail price"></td><td class="n"><input id="wp-${p.id}" data-f="wprice" type="number" step="10" min="0" value="${p.wprice||''}" placeholder="${p.price}" style="width:6.5em" aria-label="Wholesale price"></td><td class="n"><input id="st-${p.id}" data-f="stock" type="number" step="0.5" value="${tracked(p)?p.stock:''}" placeholder="—" style="width:6em" aria-label="Stock"></td><td class="n" style="white-space:nowrap"><button class="link" data-si="${p.id}">Stock in</button><button class="link" data-del="${p.id}">Delete</button></td></tr>`).join('');
   $('siRows').innerHTML=S.stockIns.slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td class="n">${ksh(x.total)}</td><td>${esc(x.supplier||'—')}</td><td>${x.from=='Credit'?(supOwed(x.supplier)>0?`<span class="tag ref">On credit</span> <button class="link" data-supay="${esc(x.supplier||'')}">Pay</button>`:'<span class="tag">Credit · paid</span>'):esc(x.from=='Cash'?'Drawer':x.from)}</td><td class="n"><button class="link" data-sidel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="7" class="note">No stock received yet. Tap <b>+ Stock in from supplier</b> when meat arrives.</td></tr>';
+  $('wsRows').innerHTML=(S.wastes||[]).slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td>${esc(x.reason)}${x.note?' <span class="note">· '+esc(x.note)+'</span>':''}</td><td class="n">${x.value?ksh(x.value):'—'}</td><td class="n"><button class="link" data-wsdel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">No waste recorded yet.</td></tr>';
   renderSup();
 }
 $('menuRows').oninput=e=>{
@@ -1094,6 +1130,30 @@ $('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty'
   toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
 $('siRows').onclick=e=>{const id=e.target.dataset.sidel;if(!id)return;const x=S.stockIns.find(y=>y.id==id);if(!x)return;
   ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);syncDelete('stockIns',x);logA('Stock in undone',x.name+' '+(x.unit=='kg'?kg(x.qty):x.qty+' pc'));save();renderMenu()})};
+
+/* ---------- meat loss ---------- */
+const qf=(q,u)=>u=='kg'?kg(q):(+q.toFixed(2))+' pc';
+function lossTable(R){if(!R.loss.length)return `<h3 style="margin-top:22px">Meat loss</h3><p class="note">No stock in or waste recorded here. Use <b>+ Stock in</b>, <b>− Waste / loss</b> and <b>✓ Count stock</b> on the Products tab to see how much meat is lost.</p>`;
+  const rows=R.loss.map(r=>{const pc=r.bought?r.lost/r.bought*100:null,why=Object.entries(r.why).map(([k,v])=>esc(k)+' '+qf(v,r.unit)).join(' · ');
+    return `<tr><td>${esc(r.n)}${why?'<br><span class="note">'+why+'</span>':''}</td><td class="n">${r.bought?qf(r.bought,r.unit):'—'}</td><td class="n">${r.sold?qf(r.sold,r.unit):'—'}</td><td class="n">${r.lost?qf(r.lost,r.unit):'—'}</td><td class="n">${pc==null?'—':`<b${pc>=5?' style="color:#c8102e"':''}>${pc.toFixed(1)}%</b>`}</td><td class="n">${r.value?ksh(r.value):'—'}</td></tr>`}).join('');
+  return `<h3 style="margin-top:22px">Meat loss</h3><div class="scroll"><table><thead><tr><th>Product</th><th class="n">Bought</th><th class="n">Sold</th><th class="n">Lost</th><th class="n">Loss %</th><th class="n">KSh lost</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">Loss % = meat lost ÷ meat bought in this period. Red means 5% or more, so check that product. Record waste with <b>− Waste / loss</b> and do <b>✓ Count stock</b> often, so the numbers are true.</p>`}
+function addWaste(p,q,reason,note){const c=p.cost??null,x={id:'w'+Date.now()+Math.floor(Math.random()*1000),br:S.branch||'',time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:r3(q),reason,note:note||'',cost:c,value:c==null?0:Math.round(q*c),by:S.cashier};
+  S.wastes.push(x);if(tracked(p))p.stock=r3(p.stock-q);logA('Waste',p.name+' −'+qf(q,p.unit)+' · '+reason);return x}
+function openWs(){$('wsProd').innerHTML=byCat(S.products).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('wsQty').value='';$('wsNote').value='';$('wsWhy').selectedIndex=0;wsFill();$('wsM').classList.add('on');$('wsQty').focus()}
+function wsFill(){const p=prod($('wsProd').value);if(!p)return;$('wsQL').textContent='Quantity ('+(p.unit=='kg'?'kg':'pieces')+')';const q=parseFloat($('wsQty').value)||0;$('wsTot').textContent=p.cost==null?'No buying price':ksh(q*p.cost)}
+$('wsProd').onchange=wsFill;$('wsQty').oninput=wsFill;$('openWs').onclick=openWs;$('wsNo').onclick=()=>$('wsM').classList.remove('on');
+$('wsGo').onclick=()=>{const p=prod($('wsProd').value),q=r3(parseFloat($('wsQty').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}
+  addWaste(p,q,$('wsWhy').value,$('wsNote').value.trim());save();$('wsM').classList.remove('on');renderMenu();toast(`${p.name}: −${qf(q,p.unit)} recorded as ${$('wsWhy').value.toLowerCase()}`)};
+function openCn(){$('cnRows').innerHTML=byCat(S.products).map(p=>`<tr data-cn="${p.id}"><td>${esc(p.name)}</td><td class="n">${tracked(p)?qf(p.stock,p.unit):'<span class="note">not counted</span>'}</td><td class="n"><input type="number" min="0" step="${p.unit=='kg'?'0.1':'1'}" inputmode="decimal" style="width:6.5em" aria-label="Real count for ${esc(p.name)}"> ${p.unit=='kg'?'kg':'pc'}</td><td class="n" data-df></td></tr>`).join('');$('cnM').classList.add('on')}
+$('cnRows').oninput=e=>{const tr=e.target.closest('tr');if(!tr)return;const p=prod(tr.dataset.cn),v=e.target.value,c=tr.querySelector('[data-df]');if(v===''||!tracked(p)){c.textContent='';return}const d=r3(parseFloat(v)-p.stock);c.innerHTML=d<0?`<b style="color:#c8102e">−${qf(-d,p.unit)}</b>`:d>0?'+'+qf(d,p.unit):'✓'};
+$('openCn').onclick=openCn;$('cnNo').onclick=()=>$('cnM').classList.remove('on');
+$('cnGo').onclick=()=>{let short=0,n=0,val=0;$('cnRows').querySelectorAll('tr[data-cn]').forEach(tr=>{const v=tr.querySelector('input').value;if(v==='')return;const p=prod(tr.dataset.cn),real=r3(parseFloat(v)||0);if(!p)return;n++;
+    if(tracked(p)&&real<p.stock){const x=addWaste(p,p.stock-real,'Missing (stock count)','Till said '+qf(p.stock,p.unit));short++;val+=x.value}
+    p.stock=real});
+  if(!n){toast('Type at least one real count');return}logA('Stock count',n+' product'+(n==1?'':'s')+' counted');save();$('cnM').classList.remove('on');renderMenu();
+  toast(short?`Saved. ${short} product${short==1?'':'s'} short, worth ${ksh(val)}`:'Saved. No meat missing')};
+$('wsRows').onclick=e=>{const id=e.target.dataset.wsdel;if(!id)return;const x=S.wastes.find(y=>y.id==id);if(!x)return;
+  ask('Undo this waste?',`${x.name} ${qf(x.qty,x.unit)} will be put back on stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock+x.qty);S.wastes=S.wastes.filter(y=>y!==x);syncDelete('wastes',x);logA('Waste undone',x.name+' '+qf(x.qty,x.unit));save();renderMenu()})};
 
 /* ---------- auto-lock ---------- */
 var lastAct=Date.now();['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},true));
@@ -1209,10 +1269,10 @@ const BRANCHES=[{id:'b1',name:'Silver Meats 1',short:'Juja Road',loc:'Juja Road'
 if(S.branch===undefined){S.branch=/ushrika/i.test(S.loc||'')&&S.orders.length?'b2':''}
 if(!S.syncH)S.syncH={};if(!S.syncDel)S.syncDel=[];
 var VIEW='local',REMOTE={key:'',data:null,at:0,loading:false,err:''},FBT={tok:'',exp:0},syncTimer=null,syncBusy=false;
-const SYNC_COLLS=['orders','payments','expenses','stockIns','supPays'];
+const SYNC_COLLS=['orders','payments','expenses','stockIns','supPays','wastes'];
 function fbCfg(){return {key:(S.fbKey||'').trim(),proj:(S.fbProj||'').trim()}}
 function fbOn(){return !!(fbCfg().key&&fbCfg().proj&&S.fbAuth&&S.fbAuth.refresh)}
-function SRC(){if(VIEW=='local'){if(!S.branch)return S;const own=a=>(a||[]).filter(r=>!r.br||r.br===S.branch);return {orders:own(S.orders),payments:own(S.payments),expenses:own(S.expenses),stockIns:own(S.stockIns),supPays:own(S.supPays)}}const d=REMOTE.data||{};if(VIEW=='all')return d;const f=a=>(a||[]).filter(x=>x.br==VIEW);return {orders:f(d.orders),payments:f(d.payments),expenses:f(d.expenses),stockIns:f(d.stockIns),supPays:f(d.supPays)}}
+function SRC(){if(VIEW=='local'){if(!S.branch)return S;const own=a=>(a||[]).filter(r=>!r.br||r.br===S.branch);return {orders:own(S.orders),payments:own(S.payments),expenses:own(S.expenses),stockIns:own(S.stockIns),supPays:own(S.supPays),wastes:own(S.wastes)}}const d=REMOTE.data||{};if(VIEW=='all')return d;const f=a=>(a||[]).filter(x=>x.br==VIEW);return {orders:f(d.orders),payments:f(d.payments),expenses:f(d.expenses),stockIns:f(d.stockIns),supPays:f(d.supPays),wastes:f(d.wastes)}}
 const docId=(c,r)=>c=='orders'?(r.id||((r.br||S.branch||'x')+'-'+r.no+'-'+r.time)):(r.br||S.branch||'x')+'_'+r.id;
 function hashS(t){let h=5381;for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return h.toString(36)+':'+t.length}
 function syncDelete(c,r){if(!S.branch)return;S.syncDel.push({c,id:docId(c,r)});delete S.syncH[c+'/'+docId(c,r)]}
