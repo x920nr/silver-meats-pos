@@ -164,7 +164,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
       <button id="n-cust" data-v="cust">Customers</button>
       <button id="n-set" data-v="set">Settings</button>
     </nav>
-    <div class="who"><label for="cashier">Cashier</label><select id="cashier"></select><button class="btn" id="lockBtn" style="min-height:40px;padding:6px 12px;display:none" title="Switch back to a cashier">🔒 Lock</button><button class="btn" id="alertBtn" title="Alerts" style="min-height:40px;padding:6px 10px;position:relative">🔔<span id="alertN" style="display:none;position:absolute;top:-6px;right:-6px;background:#c8102e;color:#fff;border-radius:10px;font-size:12px;padding:0 6px;font-weight:800"></span></button><span class="clock" id="clock"></span></div>
+    <div class="who"><label for="cashier">Cashier</label><select id="cashier"></select><button class="btn" id="lockBtn" style="min-height:40px;padding:6px 12px;display:none" title="Switch back to a cashier">🔒 Lock</button><button class="btn" id="alertBtn" title="Alerts" style="min-height:40px;padding:6px 10px;position:relative">🔔<span id="alertN" style="display:none;position:absolute;top:-6px;right:-6px;background:#c8102e;color:#fff;border-radius:10px;font-size:12px;padding:0 6px;font-weight:800"></span></button><span id="syncDot" title="Sync" style="font-size:14px;white-space:nowrap"></span><span class="clock" id="clock"></span></div>
   </header>
 
   <main id="reg" class="view on">
@@ -191,6 +191,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     <div class="toolbar">
       <label for="day" class="note">Day</label><input type="date" id="day">
       <button class="chip" id="dayToday">Today</button>
+      <span class="row" id="brBar" role="group" aria-label="Branch" style="gap:4px;display:none"></span>
       <span class="row" id="perBar" role="group" aria-label="Report period" style="gap:4px"><button class="chip" data-per="day" aria-pressed="true">Day</button><button class="chip" data-per="week" aria-pressed="false">Week</button><button class="chip" data-per="month" aria-pressed="false">Month</button></span>
       <span id="closedPill"></span><span class="sp"></span>
       <button class="btn" id="addExp">+ Expense</button>
@@ -234,6 +235,19 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 
   <main id="set" class="view"><div class="wrap">
     <h2>Shop settings</h2>
+    <div class="card" id="syncCard">
+      <h3>Branch &amp; sync</h3>
+      <p class="note">Choose the branch this till is at. With sync on, every sale, payment, expense and stock-in is sent to the online database, and the owner's laptop can see <b>all branches</b> in Sales. No internet? Sales wait and send later.</p>
+      <div class="form" style="margin-top:10px">
+        <label>This till is at<select id="sBranch" style="width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px;min-height:40px"></select></label>
+        <label>Sync status<span id="syncInfo" style="color:var(--ink);font-weight:600;padding:8px 0"></span></label>
+        <label>Database project ID<input id="fbProj" autocomplete="off" placeholder="from Firebase setup"></label>
+        <label>Database web key<input id="fbKey" autocomplete="off" placeholder="from Firebase setup"></label>
+        <label>Shop login email<input id="fbEmail" type="email" autocomplete="username" placeholder="shop email"></label>
+        <label>Shop login password<input id="fbPass" type="password" autocomplete="current-password" placeholder="password (not saved)"></label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn pay sm" id="fbIn" type="button">Sign in &amp; start sync</button><button class="btn" id="fbSync" type="button">Sync now</button><button class="btn" id="fbOut" type="button">Sign out</button></div>
+    </div>
     <div class="card">
       <h3>Receipt details</h3>
       <p class="note">These print at the top and bottom of every receipt.</p>
@@ -536,7 +550,7 @@ if(!S.v7){ /* upgrade: remove the demo sales and demo till number from the first
   Object.assign(S,{loc:S.loc||'',phone:S.phone||'',pin:S.pin||'',footer:S.footer||'Asante! Karibu tena.',staff:S.staff||['Owner'],closes:S.closes||{},v7:1});
   S.cashier=S.cashier||S.staff[0];
 }
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(typeof scheduleCloud=='function')scheduleCloud();try{renderAlertBadge()}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};if(typeof scheduleCloud=='function')scheduleCloud();try{renderAlertBadge()}catch(e){};try{if(typeof syncSoon=='function')syncSoon()}catch(e){}};
 function logA(a,d){if(!S.log)S.log=[];S.log.push({t:Date.now(),by:S.cashier||'',a,d:d||''});if(S.log.length>3000)S.log.splice(0,S.log.length-3000)}
 if(!S.phone)S.phone='0794 506 667';
 if(S.hours==null)S.hours='Open 6:00 AM – 4:00 PM';
@@ -687,7 +701,7 @@ $('payCancel').onclick=()=>$('payM').classList.remove('on');
 const moveStock=(o,sign)=>o.items.forEach(l=>{const p=prod(l.id);if(p&&tracked(p))p.stock=r3(p.stock+sign*l.qty)});
 $('payDone').onclick=()=>{
   const T=sums(S.cart,S.disc,S.tax);let cr=null;if(method=='Credit'){cr=crCustomer();if(!cr)return}
-  const o={no:S.next++,time:Date.now(),items:S.cart.map(l=>({...l})),sub:T.sub,disc:T.d,discPct:S.disc,tax:T.t,taxPct:S.tax,total:T.total,method,status:'Paid',cashier:S.cashier,mode:S.mode};
+  const o={no:S.next++,time:Date.now(),items:S.cart.map(l=>({...l})),sub:T.sub,disc:T.d,discPct:S.disc,tax:T.t,taxPct:S.tax,total:T.total,method,status:'Paid',cashier:S.cashier,mode:S.mode,br:S.branch||''};o.id=(S.branch||'x')+'-'+o.no+'-'+o.time;
   if(method!='Credit'){const c=$('custName').value.trim(),ph=$('custPh').value.trim();if(c)o.customer=c;if(ph)o.custPhone=ph}
   if(method=='Cash'){o.tendered=parseFloat($('tend').value)||o.total;o.change=o.tendered-o.total}
   else if(method=='Split'){const mp=Math.round(parseFloat($('spMp').value)||0),ca=Math.round(parseFloat($('spCash').value)||0);o.split={mp,cash:o.total-mp,given:ca};o.change=ca-(o.total-mp);const c=$('spCode').value.trim().toUpperCase();if(c)o.code=c}
@@ -696,10 +710,12 @@ $('payDone').onclick=()=>{
   moveStock(o,-1);S.orders.push(o);if(o.disc)logA('Discount given','Receipt #'+o.no+' '+o.discPct+'% = '+ksh(o.disc));S.cart=[];S.disc=0;save();
   $('payM').classList.remove('on');openReceipt(o);renderReg();
 };
-function head(){return [S.loc,S.phone?'Tel '+S.phone:'',S.hours||'',S.pin?'KRA PIN '+S.pin.toUpperCase():''].filter(Boolean)}
+function brOf(o){return o&&o.br&&o.br!==S.branch&&typeof BRANCHES!='undefined'?BRANCHES.find(b=>b.id==o.br):null}
+const shopName=o=>{const B=brOf(o);return B?B.name:S.name};
+function head(o){const B=brOf(o);return [B?B.loc:S.loc,S.phone?'Tel '+S.phone:'',S.hours||'',S.pin?'KRA PIN '+S.pin.toUpperCase():''].filter(Boolean)}
 function receiptText(o){
   const w=32,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,c=t=>' '.repeat(Math.max(0,Math.floor((w-t.length)/2)))+t;
-  return [c((S.name||'').toUpperCase()),...head().flatMap(h=>wrapT(h,w)).map(c),'-'.repeat(w),'Receipt #'+o.no,new Date(o.time).toLocaleString('en-KE'),...(o.cashier?['Served by '+o.cashier]:[]),...(o.mode=='wholesale'?['WHOLESALE SALE']:[]),...(o.customer&&o.method!='Credit'?['Customer: '+o.customer]:[]),'-'.repeat(w),
+  return [c((shopName(o)||'').toUpperCase()),...head(o).flatMap(h=>wrapT(h,w)).map(c),'-'.repeat(w),'Receipt #'+o.no,new Date(o.time).toLocaleString('en-KE'),...(o.cashier?['Served by '+o.cashier]:[]),...(o.mode=='wholesale'?['WHOLESALE SALE']:[]),...(o.customer&&o.method!='Credit'?['Customer: '+o.customer]:[]),'-'.repeat(w),
     ...o.items.flatMap(l=>[l.name.slice(0,w),row('  '+qtyTxt(l)+' x '+l.price,ksh(l.amt))]),'-'.repeat(w),row('Subtotal',ksh(o.sub)),
     ...(o.disc?[row('Discount '+o.discPct+'%','-'+ksh(o.disc))]:[]),...(o.tax?[row('VAT '+o.taxPct+'%',ksh(o.tax))]:[]),row('TOTAL',ksh(o.total)),
     ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:(o.method=='Split'?[row('Paid M-Pesa',ksh(o.split.mp)),row('Paid Cash',ksh(o.split.given))]:[row('Paid '+o.method,ksh(o.tendered||o.total))])),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
@@ -707,7 +723,7 @@ function receiptText(o){
 }
 function openReceipt(o){
   lastOrder=o;
-  $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(S.name)}</h2>${head().map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
+  $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(shopName(o))}</h2>${head(o).map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
     linesHTML(o.items,false)+totHTML({sub:o.sub,d:o.disc,pct:o.discPct,t:o.tax,tp:o.taxPct,total:o.total})+
     `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:(o.method=='Split'?`<div><span>Paid · M-Pesa</span><span>${ksh(o.split.mp)}</span></div><div><span>Paid · Cash</span><span>${ksh(o.split.given)}</span></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`)}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
     `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>${S.privRc?'<p class="hd" style="margin-top:6px;font-size:11px">Your details are used only for receipts and credit. Ask us to delete them.</p>':''}`;
@@ -750,18 +766,19 @@ function rangeOf(day,p){const d=new Date(day+'T00:00:00');let a,b;
   else{a=d;b=new Date(d);b.setDate(d.getDate()+1)}
   const f=x=>x.toLocaleDateString('en-KE',{day:'numeric',month:'short'});
   return {a:+a,b:+b,label:p=='week'?'Week '+f(a)+' – '+f(new Date(+b-864e5)):p=='month'?a.toLocaleDateString('en-KE',{month:'long',year:'numeric'}):dayName(day)}}
-function report(day,p=per){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<RG.b;
-  const pays=S.payments.filter(x=>inR(x.time)),payCash=pays.filter(x=>x.method=='Cash').reduce((a,x)=>a+x.amount,0),payMp=pays.filter(x=>x.method=='M-Pesa').reduce((a,x)=>a+x.amount,0);
-  const all=S.orders.filter(o=>inR(o.time)),paid=all.filter(o=>o.status=='Paid'),ref=all.filter(o=>o.status=='Refunded');
+function report(day,p=per,src=SRC()){const RG=rangeOf(day,p),inR=t=>t>=RG.a&&t<RG.b;
+  const pays=(src.payments||[]).filter(x=>inR(x.time)),payCash=pays.filter(x=>x.method=='Cash').reduce((a,x)=>a+x.amount,0),payMp=pays.filter(x=>x.method=='M-Pesa').reduce((a,x)=>a+x.amount,0);
+  const all=(src.orders||[]).filter(o=>inR(o.time)),paid=all.filter(o=>o.status=='Paid'),ref=all.filter(o=>o.status=='Refunded');
   const sum=(a,f)=>a.reduce((s,o)=>s+f(o),0),prods={},staff={};
   paid.forEach(o=>{o.items.forEach(l=>{const k=l.name;prods[k]=prods[k]||{qty:0,unit:l.unit,amt:0,cost:0,known:0,missing:0,cat:(prod(l.id)||{}).cat||'Other'};prods[k].qty+=l.qty;prods[k].amt+=l.amt;const lc=lineCost(l);if(lc==null)prods[k].missing+=l.amt;else{prods[k].cost+=lc;prods[k].known+=l.amt}});const c=o.cashier||'—';staff[c]=staff[c]||{n:0,amt:0};staff[c].n++;staff[c].amt+=o.total});
   const kgCat=c=>Object.values(prods).filter(p=>p.cat==c&&p.unit=='kg').reduce((s,p)=>s+p.qty,0);
   const pv=Object.values(prods),costT=pv.reduce((a,x)=>a+x.cost,0),knownT=pv.reduce((a,x)=>a+x.known,0),missingT=pv.reduce((a,x)=>a+x.missing,0),profit=knownT-costT-(sum(paid,o=>o.disc)*(knownT/Math.max(1,knownT+missingT)));
-  const exps=S.expenses.filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
-  const sps=(S.supPays||[]).filter(x=>inR(x.time)),supT=sps.reduce((a,x)=>a+x.amount,0),supCash=sps.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.amount,0),supMp=sps.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.amount,0);
-  const sins=S.stockIns.filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
+  const exps=(src.expenses||[]).filter(e=>inR(e.time)),expT=exps.reduce((a,e)=>a+e.amount,0),expCash=exps.filter(e=>e.from=='Cash').reduce((a,e)=>a+e.amount,0),expMp=exps.filter(e=>e.from=='M-Pesa').reduce((a,e)=>a+e.amount,0);
+  const sps=(src.supPays||[]).filter(x=>inR(x.time)),supT=sps.reduce((a,x)=>a+x.amount,0),supCash=sps.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.amount,0),supMp=sps.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.amount,0);
+  const sins=(src.stockIns||[]).filter(x=>inR(x.time)),stockT=sins.reduce((a,x)=>a+x.total,0),stockCash=sins.filter(x=>x.from=='Cash').reduce((a,x)=>a+x.total,0),stockMp=sins.filter(x=>x.from=='M-Pesa').reduce((a,x)=>a+x.total,0);
   const days={},dd=k=>days[k]=days[k]||{n:0,amt:0,profit:0,exp:0};paid.forEach(o=>{const x=dd(dk(o.time));x.n++;x.amt+=o.total;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});exps.forEach(e=>{dd(dk(e.time)).exp+=e.amount});
-  return {sps,supT,RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash-supCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp-supMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
+  const byBr={};paid.forEach(o=>{const b=o.br||'?',x=byBr[b]=byBr[b]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};x.n++;x.net+=o.total;x.cash+=o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0;x.mp+=o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0;x.credit+=o.method=='Credit'?o.total:0;o.items.forEach(l=>{const c=lineCost(l);if(c!=null)x.profit+=l.amt-c})});
+  return {byBr,sps,supT,RG,exps,expT,expCash,sins,stockT,stockCash,days,netProfit:profit-expT,costT,knownT,missingT,profit,all,paid,ref,gross:sum(paid,o=>o.sub),disc:sum(paid,o=>o.disc),tax:sum(paid,o=>o.tax),net:sum(paid,o=>o.total),cash:sum(paid,o=>o.method=='Cash'?o.total:o.method=='Split'?o.split.cash:0)+payCash-expCash-stockCash-supCash,mp:sum(paid,o=>o.method=='M-Pesa'?o.total:o.method=='Split'?o.split.mp:0)+payMp-expMp-stockMp-supMp,credit:sum(paid.filter(o=>o.method=='Credit'),o=>o.total),payCash,payMp,refAmt:sum(ref,o=>o.total),whole:sum(paid.filter(o=>o.mode=='wholesale'),o=>o.total),wholeN:paid.filter(o=>o.mode=='wholesale').length,prods,staff,beefKg:kgCat('Beef'),chKg:kgCat('Chicken')};
 }
 function catGroups(R){
   return CATS.map(c=>{
@@ -777,24 +794,29 @@ function groupTable(R){
 }
 function renderOrders(){
   $('day').value=selDay;document.querySelectorAll('#perBar [data-per]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.per==per));
-  const R=report(selDay),cl=per=='day'?S.closes[selDay]:null,isToday=per=='day'&&selDay==dk(Date.now());
+  renderBrBar();const remote=VIEW!='local';if(remote)ensureRemote();
+  const brName=b=>(BRANCHES.find(x=>x.id==b)||{}).name||'Unknown branch';
+  const R=report(selDay),cl=per=='day'&&!remote?S.closes[selDay]:null,isToday=per=='day'&&selDay==dk(Date.now());
   $('closeDay').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';
   $('closedPill').innerHTML=cl?`<span class="pill ok">Closed by ${esc(cl.by)} at ${hm(cl.at)}</span>`:'';
   const when=per=='day'?(isToday?'today':'on '+R.RG.label):'· '+R.RG.label;
   const st=(v,l,c)=>`<div class="stat"><b${c?` style="color:${c}"`:""}>${v}</b><span>${l}</span></div>`;
-  const exRows=R.exps.slice().sort((a,b)=>b.time-a.time).map(e=>`<tr><td style="white-space:nowrap">${new Date(e.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(e.cat)}${e.note?' <span class="note">· '+esc(e.note)+'</span>':''}</td><td>${esc(e.from=='Cash'?'Drawer':e.from)}</td><td class="n">${ksh(e.amount)}</td><td class="n"><button class="link" data-exdel="${e.id}">Delete</button></td></tr>`).join('');
+  const exRows=R.exps.slice().sort((a,b)=>b.time-a.time).map(e=>`<tr><td style="white-space:nowrap">${new Date(e.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(e.cat)}${e.note?' <span class="note">· '+esc(e.note)+'</span>':''}</td><td>${esc(e.from=='Cash'?'Drawer':e.from)}</td><td class="n">${ksh(e.amount)}</td><td class="n">${remote?'<span class="note">'+esc(brName(e.br))+'</span>':`<button class="link" data-exdel="${e.id}">Delete</button>`}</td></tr>`).join('');
   const dayRows=Object.entries(R.days).sort((a,b)=>a[0]<b[0]?-1:1).map(([k,d])=>`<tr><td><button class="link" data-goday="${k}">${new Date(k+'T12:00').toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})}</button></td><td class="n">${d.n}</td><td class="n">${ksh(d.amt)}</td><td class="n">${ksh(d.profit)}</td><td class="n">${d.exp?ksh(d.exp):'—'}</td><td class="n"><b>${ksh(d.profit-d.exp)}</b></td></tr>`).join('');
-  $('ordWrap').innerHTML=`<h2>${R.paid.length?`${ksh(R.net)} from ${R.paid.length} sale${R.paid.length==1?'':'s'} ${when}`:`No sales ${per=='day'?(isToday?'yet today':'on '+R.RG.label):'· '+R.RG.label}`}</h2>
+  const brTable=remote&&VIEW=='all'?`<h3>Branches</h3><div class="scroll" style="margin-bottom:18px"><table><thead><tr><th>Branch</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Cash</th><th class="n">M-Pesa</th><th class="n">Credit</th><th class="n">Profit</th></tr></thead><tbody>${BRANCHES.map(b=>{const x=R.byBr[b.id]||{n:0,net:0,cash:0,mp:0,credit:0,profit:0};return `<tr><td><button class="link" data-vw="${b.id}">${esc(b.name)}</button> <span class="note">${esc(b.short)}</span></td><td class="n">${x.n}</td><td class="n"><b>${ksh(x.net)}</b></td><td class="n">${ksh(x.cash)}</td><td class="n">${ksh(x.mp)}</td><td class="n">${ksh(x.credit)}</td><td class="n">${ksh(x.profit)}</td></tr>`}).join('')}</tbody></table></div>`:'';
+  const remoteNote=remote?`<p class="note" style="margin:-8px 0 14px">${REMOTE.loading?'⏳ Loading branch sales…':REMOTE.err?'⚠️ '+esc(REMOTE.err):'Branch sales from the online database · updated '+(REMOTE.at?hm(REMOTE.at):'—')} <button class="link" id="rfRemote">Refresh</button></p>`:'';
+  $('ordWrap').innerHTML=`${remoteNote}<h2>${remote?esc(VIEW=='all'?'All branches':brName(VIEW))+': ':''}${R.paid.length?`${ksh(R.net)} from ${R.paid.length} sale${R.paid.length==1?'':'s'} ${when}`:`No sales ${per=='day'?(isToday?'yet today':'on '+R.RG.label):'· '+R.RG.label}`}</h2>
   <div class="stats">${st(ksh(R.cash),'Cash in drawer')}${st(ksh(R.mp),'M-Pesa')}${R.credit?st(ksh(R.credit),'Sold on credit (deni)'):''}${R.payCash+R.payMp?st(ksh(R.payCash+R.payMp),'Debt payments received'):''}${st(ksh(R.profit),'Profit on meat'+(R.knownT?' ('+Math.round(R.profit/Math.max(1,R.knownT)*100)+'%)':'')+(R.missingT?' *':''))}${st(ksh(R.expT),'Expenses')}${st(ksh(R.netProfit),'Net profit (after expenses)',R.netProfit<0?'#c8102e':'')}${R.stockT?st(ksh(R.stockT),'Stock bought'):''}${R.supT?st(ksh(R.supT),'Paid to suppliers (deni)'):''}${st(kg(R.beefKg),'Beef sold')}${st(kg(R.chKg),'Chicken sold by weight')}${st(ksh(R.net-R.whole),'Retail')}${st(ksh(R.whole),'Wholesale ('+R.wholeN+')')}${R.ref.length?st(ksh(R.refAmt),R.ref.length+' refunded'):''}</div>
-  <div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
+  ${brTable}<div class="two"><div><h3>Sales by product</h3>${groupTable(R)}${R.missingT?`<p class="note">* ${ksh(R.missingT)} of sales have no buying price yet, so their profit is not counted. Add buying prices on the Products tab.</p>`:''}
   <h3 style="margin-top:22px">Expenses</h3>${exRows?`<div class="scroll"><table><thead><tr><th>Date</th><th>Expense</th><th>Paid from</th><th class="n">KSh</th><th></th></tr></thead><tbody>${exRows}</tbody></table></div>`:'<p class="note">No expenses here. Tap <b>+ Expense</b> to add rent, wages, transport and so on.</p>'}</div>
   <div>${per=='day'?`<h3>Receipts</h3>${R.all.length?`<div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Cashier</th><th>Paid by</th><th class="n">Total</th><th></th></tr></thead><tbody>
-  ${R.all.slice().reverse().map(o=>`<tr><td>${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method=='Split'?'Cash + M-Pesa':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}">View</button>${o.status=='Paid'?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
+  ${R.all.slice().sort((a,b)=>b.time-a.time).map(o=>`<tr><td>${remote?'<span class="note">'+esc(brName(o.br))+'</span> ':''}${o.no}</td><td style="white-space:nowrap">${hm(o.time)}</td><td>${esc(o.cashier||'—')}</td><td><span class="tag ${o.status=='Refunded'?'ref':o.method=='M-Pesa'?'mp':''}">${o.status=='Refunded'?'Refunded':o.method=='Split'?'Cash + M-Pesa':o.method}</span>${o.customer&&o.mode!='wholesale'?' '+esc(o.customer):''}${o.mode=='wholesale'?` <span class="tag" style="background:#111;color:#fff">Wholesale</span>${o.customer?' '+esc(o.customer):''}`:''}</td><td class="n">${ksh(o.total)}</td><td class="n"><button class="link" data-view="${o.no}" data-vid="${esc(o.id||'')}">View</button>${o.status=='Paid'&&!remote?`<button class="link" data-refund="${o.no}">Refund</button>`:''}</td></tr>`).join('')}
   </tbody></table></div>`:'<p class="note">No receipts for this day.</p>'}`:`<h3>Day by day</h3>${dayRows?`<div class="scroll"><table><thead><tr><th>Day</th><th class="n">Sales</th><th class="n">KSh</th><th class="n">Profit</th><th class="n">Expenses</th><th class="n">Net</th></tr></thead><tbody>${dayRows}</tbody></table></div><p class="note">Tap a day to open it.</p>`:'<p class="note">No sales in this period.</p>'}`}</div></div>`;
 }
 function zText(day){
   const R=report(day),w=34,row=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,cl=per=='day'?S.closes[day]:null;
-  return [(S.name||'').toUpperCase(),(per=='day'?'END OF DAY REPORT':per=='week'?'WEEKLY REPORT':'MONTHLY REPORT'),R.RG.label,'='.repeat(w),
+  const brLbl=VIEW=='local'?(S.name||''):VIEW=='all'?'SILVER MEATS — ALL BRANCHES':((BRANCHES.find(x=>x.id==VIEW)||{}).name||'');
+  return [brLbl.toUpperCase(),...(VIEW=='all'?BRANCHES.map(b=>{const x=R.byBr[b.id]||{n:0,net:0};return row(b.name+' ('+x.n+')',ksh(x.net))}).concat(['-'.repeat(w)]):[]),(per=='day'?'END OF DAY REPORT':per=='week'?'WEEKLY REPORT':'MONTHLY REPORT'),R.RG.label,'='.repeat(w),
     row('Sales',String(R.paid.length)),row('Gross sales',ksh(R.gross)),...(R.disc?[row('Discounts','-'+ksh(R.disc))]:[]),...(R.tax?[row('VAT',ksh(R.tax))]:[]),row('NET TAKINGS',ksh(R.net)),row('Buying cost',ksh(R.costT)),row('PROFIT ON MEAT',ksh(R.profit)),row('Expenses','-'+ksh(R.expT)),row('NET PROFIT',ksh(R.netProfit)),...(R.stockT?[row('Stock bought',ksh(R.stockT))]:[]),...(R.supT?[row('Paid to suppliers',ksh(R.supT))]:[]),...(R.missingT?['(* '+ksh(R.missingT)+' sold without buying price)']:[]),
     ...(R.ref.length?[row('Refunds ('+R.ref.length+')',ksh(R.refAmt))]:[]),'-'.repeat(w),row('Retail',ksh(R.net-R.whole)),row('Wholesale ('+R.wholeN+')',ksh(R.whole)),'-'.repeat(w),row('Cash in drawer',ksh(R.cash)),row('M-Pesa',ksh(R.mp)),...(R.credit?[row('Sold on credit',ksh(R.credit))]:[]),...(R.payCash+R.payMp?[row('Debt paid (in above)',ksh(R.payCash+R.payMp))]:[]),'-'.repeat(w),'SALES BY PRODUCT',
     ...catGroups(R).filter(g=>g.amt>0).flatMap(g=>['',row(g.c.toUpperCase()+' '+gq(g),ksh(g.amt)),...g.rows.filter(r=>r.qty>0).map(r=>row('  '+r.n.slice(0,16)+' '+(r.unit=='kg'?kg(r.qty):r.qty+'pc'),ksh(r.amt)))]),
@@ -806,7 +828,7 @@ function zText(day){
 }
 function openZ(){
   $('zText').textContent=zText(selDay);$('zWa').href=wa(zText(selDay));{const zt='```\n'+zText(selDay)+'\n```';$('zOwn').href=waTo(S.ownPhone,zt);$('zOwn').style.display=S.ownPhone?'':'none';$('zMgr').href=waTo(S.mgrWa,zt);$('zMgr').style.display=S.mgrWa?'':'none'}$('zMail').href=mailHref((S.name||'Shop')+' — '+(per=='day'?'End of day':per=='week'?'Week':'Month')+' report — '+report(selDay).RG.label,zText(selDay));
-  $('zClose').style.display=per!='day'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
+  $('zClose').style.display=per!='day'||VIEW!='local'||S.closes[selDay]?'none':'';$('zT').textContent=per=='day'?'End of day report':per=='week'?'Week report':'Month report';$('zM').classList.add('on');
 }
 $('closeDay').onclick=openZ;
 $('zBack').onclick=()=>$('zM').classList.remove('on');
@@ -816,8 +838,9 @@ $('day').onchange=e=>{if(e.target.value){selDay=e.target.value;renderOrders()}};
 $('dayToday').onclick=()=>{selDay=dk(Date.now());renderOrders()};
 $('ordWrap').onclick=e=>{
   const d0=e.target.dataset;if(d0.goday){selDay=d0.goday;per='day';renderOrders();return}
-  if(d0.exdel){const x=S.expenses.find(y=>y.id==d0.exdel);if(x)ask('Delete this expense?',x.cat+' '+ksh(x.amount),'Delete',()=>{S.expenses=S.expenses.filter(y=>y!==x);logA('Expense deleted',x.cat+' '+ksh(x.amount));save();renderOrders()});return}
-  const d=e.target.dataset,o=S.orders.find(x=>x.no==(d.view||d.refund));if(!o)return;
+  if(d0.exdel){const x=S.expenses.find(y=>y.id==d0.exdel);if(x)ask('Delete this expense?',x.cat+' '+ksh(x.amount),'Delete',()=>{S.expenses=S.expenses.filter(y=>y!==x);syncDelete('expenses',x);logA('Expense deleted',x.cat+' '+ksh(x.amount));save();renderOrders()});return}
+  if(d0.vw){VIEW=d0.vw;renderOrders();return}if(e.target.id=='rfRemote'){REMOTE.key='';renderOrders();return}
+  const d=e.target.dataset,o=VIEW!='local'?(SRC().orders||[]).find(x=>d.vid&&x.id==d.vid):S.orders.find(x=>x.no==(d.view||d.refund));if(!o)return;
   if(d.view)openReceipt(o);
   if(d.refund)ask('Refund receipt #'+o.no+'?',`${ksh(o.total)} paid by ${o.method}. Give the money back to the customer. Stock will be added back.`,'Refund',()=>{o.status='Refunded';o.refundedBy=S.cashier;moveStock(o,1);logA('Refund','Receipt #'+o.no+' '+ksh(o.total)+' ('+o.method+')');save();renderOrders();toast('Receipt #'+o.no+' refunded')});
 };
@@ -907,7 +930,7 @@ $('addForm').onsubmit=e=>{e.preventDefault();
 /* ---------- settings ---------- */
 const SF={sName:'name',sLoc:'loc',sPhone:'phone',sOwnPh:'ownPhone',sMgrPh:'mgrPhone',sMgrWa:'mgrWa',sHours:'hours',sPin:'pin',sTill:'till',sFoot:'footer'};
 function renderSet(){
-  Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);$('sEmail').value=S.email||'';renderStaff();renderCloud();renderLog();renderPriv();
+  Object.entries(SF).forEach(([id,k])=>$(id).value=S[k]||'');$('sTax').value=S.tax;$('sPaper').value=S.paper||'80';$('sLock').value=String(S.lockMin);$('sEmail').value=S.email||'';renderStaff();renderCloud();renderLog();renderPriv();renderSyncSet();
   $('bkInfo').textContent=`${S.orders.length} receipt${S.orders.length==1?'':'s'} and ${S.products.length} products on this device.`;
 }
 Object.entries(SF).forEach(([id,k])=>$(id).oninput=e=>{S[k]=e.target.value;save();renderHead()});
@@ -994,7 +1017,7 @@ $('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty'
   p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;logA('Stock in',p.name+' +'+(p.unit=='kg'?kg(q):q+' pc')+' @ '+ksh(c));save();$('siM').classList.remove('on');renderMenu();
   toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
 $('siRows').onclick=e=>{const id=e.target.dataset.sidel;if(!id)return;const x=S.stockIns.find(y=>y.id==id);if(!x)return;
-  ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);logA('Stock in undone',x.name+' '+(x.unit=='kg'?kg(x.qty):x.qty+' pc'));save();renderMenu()})};
+  ask('Undo this stock in?',`${x.name} ${x.unit=='kg'?kg(x.qty):x.qty+' pc'} will be taken off stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock-x.qty);S.stockIns=S.stockIns.filter(y=>y!==x);syncDelete('stockIns',x);logA('Stock in undone',x.name+' '+(x.unit=='kg'?kg(x.qty):x.qty+' pc'));save();renderMenu()})};
 
 /* ---------- auto-lock ---------- */
 var lastAct=Date.now();['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},true));
@@ -1104,6 +1127,73 @@ function openSupStmt(name){stSup=name;$('stT').textContent='Supplier statement: 
 $('stPh').oninput=()=>{if(stSup==null)return;S.supPhones[supKey(stSup)]=$('stPh').value.trim();save();updStWa()};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-supst]');if(b&&$('menu').contains(b))openSupStmt(b.dataset.supst)});
 
+
+/* ---------- branches & live sync (Firebase Firestore over REST) ---------- */
+const BRANCHES=[{id:'b1',name:'Silver Meats 1',short:'Juja Road',loc:'Juja Road'},{id:'b2',name:'Silver Meats 2',short:'Ushrika',loc:'Ushrika, Opposite Crossroad Tower, Near Donbosco Girls Secondary School'},{id:'b3',name:'Silver Meats 3',short:'7th Street',loc:'7th Street'}];
+if(S.branch===undefined){S.branch=/ushrika/i.test(S.loc||'')&&S.orders.length?'b2':''}
+if(!S.syncH)S.syncH={};if(!S.syncDel)S.syncDel=[];
+var VIEW='local',REMOTE={key:'',data:null,at:0,loading:false,err:''},FBT={tok:'',exp:0},syncTimer=null,syncBusy=false;
+const SYNC_COLLS=['orders','payments','expenses','stockIns','supPays'];
+function fbCfg(){return {key:(S.fbKey||'').trim(),proj:(S.fbProj||'').trim()}}
+function fbOn(){return !!(fbCfg().key&&fbCfg().proj&&S.fbAuth&&S.fbAuth.refresh)}
+function SRC(){if(VIEW=='local')return S;const d=REMOTE.data||{};if(VIEW=='all')return d;const f=a=>(a||[]).filter(x=>x.br==VIEW);return {orders:f(d.orders),payments:f(d.payments),expenses:f(d.expenses),stockIns:f(d.stockIns),supPays:f(d.supPays)}}
+const docId=(c,r)=>c=='orders'?(r.id||((S.branch||'x')+'-'+r.no+'-'+r.time)):(S.branch||'x')+'_'+r.id;
+function hashS(t){let h=5381;for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return h.toString(36)+':'+t.length}
+function syncDelete(c,r){if(!S.branch)return;S.syncDel.push({c,id:docId(c,r)});delete S.syncH[c+'/'+docId(c,r)]}
+async function fbToken(){const {key}=fbCfg();if(FBT.tok&&Date.now()<FBT.exp-60000)return FBT.tok;
+  const r=await fetch('https://securetoken.googleapis.com/v1/token?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(S.fbAuth.refresh)});
+  const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||'Sign-in expired');FBT.tok=j.id_token;FBT.exp=Date.now()+(+j.expires_in||3600)*1000;if(j.refresh_token&&j.refresh_token!==S.fbAuth.refresh){S.fbAuth.refresh=j.refresh_token;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}return FBT.tok}
+const fsBase=()=>'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(fbCfg().proj)+'/databases/(default)/documents';
+const fsName=(c,id)=>'projects/'+fbCfg().proj+'/databases/(default)/documents/'+c+'/'+id;
+function syncSoon(){if(!fbOn()||!S.branch)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,4000)}
+async function syncNow(manual){if(!fbOn()){if(manual)toast('Sign in to sync first');return}if(!S.branch){if(manual)toast('Choose this till\'s branch first');return}if(syncBusy)return;syncBusy=true;
+  try{let fixed=false;S.orders.forEach(o=>{if(!o.id){o.id=(S.branch||'x')+'-'+o.no+'-'+o.time;fixed=true}if(o.br==null||o.br===''){o.br=S.branch;fixed=true}});
+    const writes=[],marks=[];
+    SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{const id=docId(c,r),j=JSON.stringify(r),h=hashS(j),k=c+'/'+id;if(S.syncH[k]===h)return;
+      writes.push({update:{name:fsName(c,id),fields:{br:{stringValue:r.br||S.branch},t:{integerValue:String(r.time||0)},j:{stringValue:j}}}});marks.push([k,h])}));
+    const dels=S.syncDel.slice();dels.forEach(d=>writes.push({delete:fsName(d.c,d.id)}));
+    if(!writes.length){S.syncAt=Date.now();S.syncErr='';if(fixed)try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};renderSyncDot();if(manual)toast('All synced');return}
+    const tok=await fbToken();
+    for(let i=0;i<writes.length;i+=300){const r=await fetch(fsBase()+':commit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({writes:writes.slice(i,i+300)})});
+      if(!r.ok){let m='Sync failed ('+r.status+')';try{const j=await r.json();m=(j.error&&j.error.message)||m}catch(e){}throw new Error(m)}}
+    marks.forEach(([k,h])=>S.syncH[k]=h);S.syncDel=S.syncDel.slice(dels.length);S.syncAt=Date.now();S.syncErr='';
+    try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(manual)toast('Synced '+writes.length+' item'+(writes.length==1?'':'s'))}
+  catch(e){S.syncErr=navigator.onLine===false?'No internet — will send later':String(e.message||e);if(manual)toast('Sync: '+S.syncErr)}
+  finally{syncBusy=false;renderSyncDot();if($('set').classList.contains('on'))renderSyncInfo()}}
+async function fetchRemote(a,b){const tok=await fbToken(),out={};
+  for(const c of SYNC_COLLS){const r=await fetch(fsBase()+':runQuery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},
+      body:JSON.stringify({structuredQuery:{from:[{collectionId:c}],where:{compositeFilter:{op:'AND',filters:[{fieldFilter:{field:{fieldPath:'t'},op:'GREATER_THAN_OR_EQUAL',value:{integerValue:String(a)}}},{fieldFilter:{field:{fieldPath:'t'},op:'LESS_THAN',value:{integerValue:String(b)}}}]}}}})});
+    const j=await r.json();if(!r.ok){throw new Error((j.error&&j.error.message)||(j[0]&&j[0].error&&j[0].error.message)||'Could not load branch sales')}
+    out[c]=(Array.isArray(j)?j:[]).filter(x=>x.document).map(x=>{const f=x.document.fields||{};let v={};try{v=JSON.parse(f.j.stringValue)}catch(e){}v.br=v.br||(f.br&&f.br.stringValue)||'';return v})}
+  return out}
+function ensureRemote(){const RG=rangeOf(selDay,per),key=RG.a+'-'+RG.b;if(REMOTE.loading)return;if(REMOTE.key===key&&Date.now()-REMOTE.at<60000)return;
+  if(!fbOn()){REMOTE={key,data:{},at:0,loading:false,err:'Sign in under Settings → Branch & sync to see other branches.'};return}
+  REMOTE.loading=true;REMOTE.err='';REMOTE.key=key;
+  syncNow().then(()=>fetchRemote(RG.a,RG.b)).then(d=>{REMOTE.data=d;REMOTE.at=Date.now();REMOTE.err=''}).catch(e=>{REMOTE.err=navigator.onLine===false?'No internet — cannot load other branches now.':String(e.message||e);REMOTE.at=Date.now()}).finally(()=>{REMOTE.loading=false;if($('ord').classList.contains('on'))renderOrders()})}
+function renderBrBar(){const show=fbOn()&&boss();$('brBar').style.display=show?'':'none';if(!show){VIEW='local';return}
+  const opts=[['local','This till'],['all','All branches'],...BRANCHES.map(b=>[b.id,b.name.replace('Silver Meats ','Branch ')])];
+  $('brBar').innerHTML=opts.map(([v,l])=>`<button class="chip" data-vw="${v}" aria-pressed="${VIEW==v}">${l}</button>`).join('')}
+$('brBar').onclick=e=>{const v=e.target.dataset.vw;if(v){VIEW=v;renderOrders()}};
+function renderSyncDot(){const d=$('syncDot');if(!fbOn()||!S.branch){d.textContent='';return}const pend=S.syncDel.length||SYNC_COLLS.some(c=>(S[c]||[]).some(r=>S.syncH[c+'/'+docId(c,r)]!==hashS(JSON.stringify(r))));
+  d.textContent=S.syncErr?'⚠️ not synced':pend?'☁️ sending…':'☁️ synced';d.title=S.syncErr||(S.syncAt?'Last sync '+hm(S.syncAt):'')}
+function renderSyncInfo(){const b=BRANCHES.find(x=>x.id==S.branch);
+  $('syncInfo').textContent=!S.branch?'Choose a branch first':!fbOn()?'Not signed in — sales stay on this device':S.syncErr?'⚠️ '+S.syncErr:'✅ On — '+(b?b.name:'')+(S.syncAt?' · last sync '+hm(S.syncAt):'');}
+function renderSyncSet(){$('sBranch').innerHTML='<option value="">— choose branch —</option>'+BRANCHES.map(b=>`<option value="${b.id}"${b.id==S.branch?' selected':''}>${esc(b.name)} – ${esc(b.short)}</option>`).join('');
+  $('fbProj').value=S.fbProj||'';$('fbKey').value=S.fbKey||'';$('fbEmail').value=(S.fbAuth&&S.fbAuth.email)||S.fbEmail||'';$('fbPass').value='';
+  const owner=role(S.cashier)=='Owner';['sBranch','fbProj','fbKey','fbEmail','fbPass','fbIn','fbOut'].forEach(i=>$(i).disabled=!owner);renderSyncInfo()}
+$('sBranch').onchange=e=>{const b=BRANCHES.find(x=>x.id==e.target.value);if(!b){S.branch='';save();renderSyncSet();return}
+  ask('This till is at '+b.name+'?',`Receipts will show "${b.name}" and "${b.loc}". All sales on this device will be counted for ${b.name}.`,'Yes',()=>{S.branch=b.id;S.name=b.name;S.loc=b.loc;S.orders.forEach(o=>{if(!o.br)o.br=b.id});logA('Branch set',b.name);save();renderHead();renderSet();toast('This till is now '+b.name)});renderSyncSet()};
+$('fbProj').onchange=e=>{S.fbProj=e.target.value.trim();save()};$('fbKey').onchange=e=>{S.fbKey=e.target.value.trim();save()};
+$('fbIn').onclick=async()=>{const {key}=fbCfg(),email=$('fbEmail').value.trim(),pw=$('fbPass').value;S.fbProj=$('fbProj').value.trim();S.fbKey=$('fbKey').value.trim();
+  if(!S.fbProj||!S.fbKey){toast('Fill in the database project ID and web key');return}if(!email||!pw){toast('Type the shop login email and password');return}
+  $('fbIn').disabled=true;try{const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(S.fbKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw,returnSecureToken:true})});
+    const j=await r.json();if(!r.ok)throw new Error(((j.error&&j.error.message)||'Sign-in failed').replace(/_/g,' ').toLowerCase());
+    S.fbAuth={email,refresh:j.refreshToken,uid:j.localId};FBT={tok:j.idToken,exp:Date.now()+(+j.expiresIn||3600)*1000};$('fbPass').value='';logA('Sync signed in',email);save();renderSyncSet();toast('Signed in. Syncing…');syncNow(true)}
+  catch(e){toast('Sign-in: '+(navigator.onLine===false?'no internet':e.message))}finally{$('fbIn').disabled=role(S.cashier)!='Owner'}};
+$('fbSync').onclick=()=>syncNow(true);
+$('fbOut').onclick=()=>ask('Stop syncing on this device?','Sales stay on this device. Sign in again to send them.','Sign out',()=>{S.fbAuth=null;FBT={tok:'',exp:0};logA('Sync signed out','');save();renderSyncSet();renderSyncDot()});
+setInterval(()=>{if(fbOn()&&S.branch)syncNow()},60000);addEventListener('online',()=>syncSoon());
+
 /* ---------- shell ---------- */
 function show(v){
   if(RESTRICTED.includes(v)&&!boss()){toast('Only the Owner or a Manager can open this');v='reg'}
@@ -1120,7 +1210,7 @@ document.addEventListener('keydown',e=>{
 const tick=()=>$('clock').textContent=new Date().toLocaleString('en-KE',{weekday:'short',hour:'numeric',minute:'2-digit'});
 tick();setInterval(tick,15000);
 if(boss()&&S.pins[S.cashier]){const c=S.staff.find(n=>role(n)=='Cashier');if(c){S.cashier=c;save()}}
-renderHead();applyAccess();renderReg();
+renderHead();applyAccess();renderReg();renderSyncDot();if(fbOn()&&S.branch)setTimeout(syncNow,2000);
 renderAlertBadge();setInterval(renderAlertBadge,60000);
 if(S.alertDay!==dk(Date.now())){S.alertDay=dk(Date.now());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};setTimeout(openAlerts,400)}
 }
