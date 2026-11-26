@@ -202,6 +202,9 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
 
   <main id="menu" class="view"><div class="wrap">
     <h2>Products, prices and stock</h2>
+    <div class="row" id="pbBar" style="display:none;margin-bottom:14px;gap:6px;align-items:center"></div>
+    <div id="pbWrap" style="display:none"></div>
+    <div id="menuLocal">
     <div class="row" style="margin-bottom:14px"><button class="btn pay sm" id="openSi" type="button">+ Stock in from supplier</button></div>
     <form class="add" id="addForm">
       <label class="wide">Product<input id="aName" required maxlength="40" placeholder="e.g. Goat meat"></label>
@@ -219,6 +222,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
     <div class="scroll"><table><thead><tr><th>Supplier</th><th class="n">You owe</th><th>Last payment</th><th></th></tr></thead><tbody id="supRows"></tbody></table></div>
     <h3 style="margin-top:26px">Stock received</h3>
     <div class="scroll"><table><thead><tr><th>Date</th><th>Product</th><th class="n">Qty</th><th class="n">Cost</th><th>Supplier</th><th>Paid from</th><th></th></tr></thead><tbody id="siRows"></tbody></table></div>
+    </div>
   </div></main>
 
   <main id="cust" class="view"><div class="wrap">
@@ -892,7 +896,7 @@ $('piQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('piAmt').value=a;upd
 $('piAmt').oninput=updPi;$('piCash').onclick=()=>setPi('Cash');$('piMp').onclick=()=>setPi('M-Pesa');
 $('piNo').onclick=()=>$('piM').classList.remove('on');
 $('piGo').onclick=()=>{const v=Math.round(parseFloat($('piAmt').value)||0);if(!(v>0))return;
-  const x={id:'y'+Date.now(),custId:piC.id,amount:v,method:piMethod,time:Date.now(),by:S.cashier};if(piMethod=='M-Pesa'){const c=$('piCode').value.trim().toUpperCase();if(c)x.code=c}
+  const x={id:'y'+Date.now(),br:S.branch||'',custId:piC.id,amount:v,method:piMethod,time:Date.now(),by:S.cashier};if(piMethod=='M-Pesa'){const c=$('piCode').value.trim().toUpperCase();if(c)x.code=c}
   S.payments.push(x);logA('Payment received',piC.name+' '+ksh(v)+' '+piMethod);save();$('piM').classList.remove('on');renderCust();
   const c=piC,msg=`${S.name}: received ${ksh(v)} by ${piMethod} from ${c.name}. Balance now ${ksh(balance(c.id))}. Asante!`;
   toast(`${ksh(v)} saved. ${c.name} now owes ${ksh(balance(c.id))}`);
@@ -902,7 +906,7 @@ $('stNo').onclick=()=>$('stM').classList.remove('on');
 $('stCopy').onclick=()=>copy($('stText').textContent,'Statement copied');
 
 /* ---------- products ---------- */
-function renderMenu(){
+function renderMenu(){try{renderPbBar()}catch(e){}
   const opts=(list,v)=>list.map(x=>`<option value="${x[0]}"${x[0]==v?' selected':''}>${x[1]}</option>`).join('');
   const cats=CATS.map(c=>[c,c]),units=[['kg','per kg'],['pc','per piece']];
   $('aCat').innerHTML=opts(cats,'Beef');
@@ -963,7 +967,7 @@ $('bkGo').onclick=()=>{
   let d;try{d=JSON.parse($('bkIn').value.trim().replace(/^SILVERPOS1:/,''))}catch(e){}
   if(!d||!Array.isArray(d.products)||!Array.isArray(d.orders)){$('bkErr').textContent='That is not a valid backup. Copy the whole text and try again.';return}
   $('bkM').classList.remove('on');
-  ask('Replace everything on this device?',`The backup has ${d.orders.length} receipts and ${d.products.length} products.`,'Restore',()=>{S=d;S.v7=1;logA('Backup restored','from pasted backup');save();renderHead();renderSet();toast('Backup restored')});
+  ask('Replace everything on this device?',`The backup has ${d.orders.length} receipts and ${d.products.length} products.`,'Restore',()=>{S=restoreKeep(d);S.v7=1;logA('Backup restored','from pasted backup');save();renderHead();renderSet();toast('Backup restored')});
 };
 $('wipe').onclick=()=>ask('Delete all sales?',`${S.orders.length} receipts will be removed from this device. This cannot be undone.`,'Delete all',()=>{logA('ALL SALES DELETED',S.orders.length+' receipts');S.orders=[];S.held=[];S.cart=[];S.closes={};S.payments=[];save();renderSet();toast('All sales deleted')});
 
@@ -1001,7 +1005,7 @@ $('addExp').onclick=()=>{$('exAmt').value='';$('exNote').value='';$('exDate').va
 $('exNo').onclick=()=>$('exM').classList.remove('on');
 $('exGo').onclick=()=>{const v=Math.round(parseFloat($('exAmt').value)||0);if(!(v>0)){toast('Type the amount');return}
   const d=$('exDate').value||dk(Date.now()),t=d==dk(Date.now())?Date.now():+new Date(d+'T12:00');
-  S.expenses.push({id:'e'+Date.now(),time:t,cat:$('exCat').value,amount:v,from:$('exFrom').value,note:$('exNote').value.trim(),by:S.cashier});logA('Expense added',$('exCat').value+' '+ksh(v));save();$('exM').classList.remove('on');renderOrders();toast('Expense saved: '+ksh(v))};
+  S.expenses.push({id:'e'+Date.now(),br:S.branch||'',time:t,cat:$('exCat').value,amount:v,from:$('exFrom').value,note:$('exNote').value.trim(),by:S.cashier});logA('Expense added',$('exCat').value+' '+ksh(v));save();$('exM').classList.remove('on');renderOrders();toast('Expense saved: '+ksh(v))};
 $('perBar').onclick=e=>{const p=e.target.dataset.per;if(p){per=p;renderOrders()}};
 
 /* ---------- stock in ---------- */
@@ -1014,7 +1018,7 @@ $('siProd').onchange=siFill;$('siQty').oninput=siTot;$('siCost').oninput=siTot;
 $('openSi').onclick=()=>openSi();
 $('siNo').onclick=()=>$('siM').classList.remove('on');
 $('siGo').onclick=()=>{const p=prod($('siProd').value),q=r3(parseFloat($('siQty').value)||0),c=Math.round(parseFloat($('siCost').value)||0);if(!p||!(q>0)){toast('Type the quantity');return}if($('siFrom').value=='Credit'&&!$('siSup').value.trim()){toast('Type the supplier name for stock on credit');$('siSup').focus();return}
-  S.stockIns.push({id:'s'+Date.now(),time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:q,cost:c,total:Math.round(q*c),supplier:$('siSup').value.trim(),from:$('siFrom').value,by:S.cashier});
+  S.stockIns.push({id:'s'+Date.now(),br:S.branch||'',time:Date.now(),prodId:p.id,name:p.name,unit:p.unit,qty:q,cost:c,total:Math.round(q*c),supplier:$('siSup').value.trim(),from:$('siFrom').value,by:S.cashier});
   p.stock=r3((tracked(p)?p.stock:0)+q);if(c>0)p.cost=c;logA('Stock in',p.name+' +'+(p.unit=='kg'?kg(q):q+' pc')+' @ '+ksh(c));save();$('siM').classList.remove('on');renderMenu();
   toast(`${p.name}: +${p.unit=='kg'?kg(q):q+' pc'}. Now ${p.unit=='kg'?kg(p.stock):p.stock+' pc'} in stock`)};
 $('siRows').onclick=e=>{const id=e.target.dataset.sidel;if(!id)return;const x=S.stockIns.find(y=>y.id==id);if(!x)return;
@@ -1042,7 +1046,7 @@ async function cloudLoad(){if(!DB||!UID)return;
   try{const col=DB.collection('data/users/'+UID),m=await col.doc('pos_meta').get();if(!m.exists){toast('No cloud backup for your account yet');return}
     const md=m.data();let j='';for(let i=0;i<md.parts;i++){const d=await col.doc('pos_part_'+i).get();j+=d.exists?(d.data().s||''):''}
     const d=JSON.parse(j);if(!d||!Array.isArray(d.products)){toast('Cloud backup is damaged');return}
-    ask('Replace everything on this device?',`Cloud backup from ${new Date(md.at).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})} with ${md.receipts} receipts.`,'Restore',()=>{S=d;S.v7=1;S.cloudAt=md.at;logA('Backup restored','from cloud');save();renderHead();applyAccess();renderSet();toast('Restored from cloud')})}
+    ask('Replace everything on this device?',`Cloud backup from ${new Date(md.at).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})} with ${md.receipts} receipts.`,'Restore',()=>{S=restoreKeep(d);S.v7=1;S.cloudAt=md.at;logA('Backup restored','from cloud');save();renderHead();applyAccess();renderSet();toast('Restored from cloud')})}
   catch(e){toast('Could not read the cloud backup: '+((e&&e.message)||(e&&e.code)||e))}}
 $('cloudSave').onclick=()=>cloudSave(true);$('cloudLoad').onclick=cloudLoad;
 (async()=>{try{if(window.claude&&window.claude.use){const u=await window.claude.use('user');const db=await window.claude.use('db');if(u&&db){const id=await u.id();if(id){DB=db;UID=id}}}}catch(e){}renderCloud();if(DB&&UID)scheduleCloud()})();
@@ -1109,7 +1113,7 @@ function updSpy(){const v=Math.round(parseFloat($('spyAmt').value)||0),owed=supO
 $('spyAmt').oninput=updSpy;$('spyQuick').onclick=e=>{const a=e.target.dataset.a;if(a){$('spyAmt').value=a;updSpy()}};
 $('spyNo').onclick=()=>$('spyM').classList.remove('on');
 $('spyGo').onclick=()=>{const v=Math.round(parseFloat($('spyAmt').value)||0);if(!(v>0))return;
-  S.supPays.push({id:'sp'+Date.now(),time:Date.now(),supplier:spyName,amount:v,from:$('spyFrom').value,note:$('spyNote').value.trim(),by:S.cashier});
+  S.supPays.push({id:'sp'+Date.now(),br:S.branch||'',time:Date.now(),supplier:spyName,amount:v,from:$('spyFrom').value,note:$('spyNote').value.trim(),by:S.cashier});
   logA('Supplier paid',spyName+' '+ksh(v)+' ('+$('spyFrom').value+')');save();$('spyM').classList.remove('on');renderMenu();toast(`${ksh(v)} paid to ${spyName||'supplier'}. Still owe ${ksh(supOwed(spyName))}`)};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-supay]');if(b&&$('menu').contains(b))openSupPay(b.dataset.supay)});
 
@@ -1137,8 +1141,8 @@ var VIEW='local',REMOTE={key:'',data:null,at:0,loading:false,err:''},FBT={tok:''
 const SYNC_COLLS=['orders','payments','expenses','stockIns','supPays'];
 function fbCfg(){return {key:(S.fbKey||'').trim(),proj:(S.fbProj||'').trim()}}
 function fbOn(){return !!(fbCfg().key&&fbCfg().proj&&S.fbAuth&&S.fbAuth.refresh)}
-function SRC(){if(VIEW=='local')return S;const d=REMOTE.data||{};if(VIEW=='all')return d;const f=a=>(a||[]).filter(x=>x.br==VIEW);return {orders:f(d.orders),payments:f(d.payments),expenses:f(d.expenses),stockIns:f(d.stockIns),supPays:f(d.supPays)}}
-const docId=(c,r)=>c=='orders'?(r.id||((S.branch||'x')+'-'+r.no+'-'+r.time)):(S.branch||'x')+'_'+r.id;
+function SRC(){if(VIEW=='local'){if(!S.branch)return S;const own=a=>(a||[]).filter(r=>!r.br||r.br===S.branch);return {orders:own(S.orders),payments:own(S.payments),expenses:own(S.expenses),stockIns:own(S.stockIns),supPays:own(S.supPays)}}const d=REMOTE.data||{};if(VIEW=='all')return d;const f=a=>(a||[]).filter(x=>x.br==VIEW);return {orders:f(d.orders),payments:f(d.payments),expenses:f(d.expenses),stockIns:f(d.stockIns),supPays:f(d.supPays)}}
+const docId=(c,r)=>c=='orders'?(r.id||((r.br||S.branch||'x')+'-'+r.no+'-'+r.time)):(r.br||S.branch||'x')+'_'+r.id;
 function hashS(t){let h=5381;for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return h.toString(36)+':'+t.length}
 function syncDelete(c,r){if(!S.branch)return;S.syncDel.push({c,id:docId(c,r)});delete S.syncH[c+'/'+docId(c,r)]}
 async function fbToken(){const {key}=fbCfg();if(FBT.tok&&Date.now()<FBT.exp-60000)return FBT.tok;
@@ -1148,11 +1152,13 @@ const fsBase=()=>'https://firestore.googleapis.com/v1/projects/'+encodeURICompon
 const fsName=(c,id)=>'projects/'+fbCfg().proj+'/databases/(default)/documents/'+c+'/'+id;
 function syncSoon(){if(!fbOn()||!S.branch)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,4000)}
 async function syncNow(manual){if(!fbOn()){if(manual)toast('Sign in to sync first');return}if(!S.branch){if(manual)toast('Choose this till\'s branch first');return}if(syncBusy)return;syncBusy=true;
-  try{let fixed=false;S.orders.forEach(o=>{if(!o.id){o.id=(S.branch||'x')+'-'+o.no+'-'+o.time;fixed=true}if(o.br==null||o.br===''){o.br=S.branch;fixed=true}});
+  try{await dedupeCopies();let fixed=false;SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{if(!r.br){r.br=S.branch;fixed=true}}));S.orders.forEach(o=>{if(!o.id){o.id=(o.br||S.branch||'x')+'-'+o.no+'-'+o.time;fixed=true}});
     const writes=[],marks=[];
+    {const pj=JSON.stringify(S.products.map(p=>({id:p.id,name:p.name,cat:p.cat,unit:p.unit,price:p.price,wprice:p.wprice||null,cost:p.cost??null}))),h=hashS(pj),k='products/'+S.branch;if(S.syncH[k]!==h){writes.push({update:{name:fsName('products',S.branch),fields:{br:{stringValue:S.branch},t:{integerValue:String(Date.now())},j:{stringValue:pj}}}});marks.push([k,h])}}
     SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{const id=docId(c,r),j=JSON.stringify(r),h=hashS(j),k=c+'/'+id;if(S.syncH[k]===h)return;
       writes.push({update:{name:fsName(c,id),fields:{br:{stringValue:r.br||S.branch},t:{integerValue:String(r.time||0)},j:{stringValue:j}}}});marks.push([k,h])}));
     const dels=S.syncDel.slice();dels.forEach(d=>writes.push({delete:fsName(d.c,d.id)}));
+    await pullPrices();
     if(!writes.length){S.syncAt=Date.now();S.syncErr='';if(fixed)try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};renderSyncDot();if(manual)toast('All synced');return}
     const tok=await fbToken();
     for(let i=0;i<writes.length;i+=300){const r=await fetch(fsBase()+':commit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({writes:writes.slice(i,i+300)})});
@@ -1183,7 +1189,7 @@ function renderSyncSet(){$('sBranch').innerHTML='<option value="">— choose bra
   $('fbProj').value=S.fbProj||'';$('fbKey').value=S.fbKey||'';$('fbEmail').value=(S.fbAuth&&S.fbAuth.email)||S.fbEmail||'';$('fbPass').value='';
   const owner=role(S.cashier)=='Owner';['sBranch','fbProj','fbKey','fbEmail','fbPass','fbIn','fbOut','fbCode','fbUse','fbShare'].forEach(i=>$(i).disabled=!owner);renderSyncInfo()}
 $('sBranch').onchange=e=>{const b=BRANCHES.find(x=>x.id==e.target.value);if(!b){S.branch='';save();renderSyncSet();return}
-  ask('This till is at '+b.name+'?',`Receipts will show "${b.name}" and "${b.loc}". All sales on this device will be counted for ${b.name}.`,'Yes',()=>{S.branch=b.id;S.name=b.name;S.loc=b.loc;S.orders.forEach(o=>{if(!o.br)o.br=b.id});logA('Branch set',b.name);save();renderHead();renderSet();toast('This till is now '+b.name)});renderSyncSet()};
+  ask('This till is at '+b.name+'?',`Receipts will show "${b.name}" and "${b.loc}". All sales on this device will be counted for ${b.name}.`,'Yes',()=>{S.branch=b.id;S.name=b.name;S.loc=b.loc;SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{if(!r.br)r.br=b.id}));logA('Branch set',b.name);save();renderHead();renderSet();toast('This till is now '+b.name)});renderSyncSet()};
 $('fbProj').onchange=e=>{S.fbProj=e.target.value.trim();save()};$('fbKey').onchange=e=>{S.fbKey=e.target.value.trim();save()};
 $('fbIn').onclick=async()=>{const {key}=fbCfg(),email=$('fbEmail').value.trim(),pw=$('fbPass').value;S.fbProj=$('fbProj').value.trim();S.fbKey=$('fbKey').value.trim();
   if(!S.fbProj||!S.fbKey){toast('Fill in the database project ID and web key');return}if(!email||!pw){toast('Type the shop login email and password');return}
@@ -1201,6 +1207,55 @@ $('fbUse').onclick=()=>{const m=($('fbCode').value||'').match(/SMSETUP:([A-Za-z0
 $('fbSync').onclick=()=>syncNow(true);
 $('fbOut').onclick=()=>ask('Stop syncing on this device?','Sales stay on this device. Sign in again to send them.','Sign out',()=>{S.fbAuth=null;FBT={tok:'',exp:0};logA('Sync signed out','');save();renderSyncSet();renderSyncDot()});
 setInterval(()=>{if(fbOn()&&S.branch)syncNow()},60000);addEventListener('online',()=>syncSoon());
+
+
+/* ---------- branch data clean-up, backup restore, per-branch prices ---------- */
+const HOME_BR='b2';
+function restoreKeep(d){const src=d.branch||'';SYNC_COLLS.forEach(c=>(d[c]||[]).forEach(r=>{if(!r.br&&src)r.br=src}));
+  Object.assign(d,{branch:S.branch||'',fbAuth:S.fbAuth||null,fbProj:S.fbProj||d.fbProj,fbKey:S.fbKey||d.fbKey,fbEmail:S.fbEmail||d.fbEmail,syncH:{},syncDel:[],dedupV1:S.dedupV1||0,priceSetT:S.priceSetT||0});return d}
+async function fsQueryBr(c,br,tok){const r=await fetch(fsBase()+':runQuery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({structuredQuery:{from:[{collectionId:c}],where:{fieldFilter:{field:{fieldPath:'br'},op:'EQUAL',value:{stringValue:br}}}}})});
+  const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||(j[0]&&j[0].error&&j[0].error.message)||'query failed');
+  return (Array.isArray(j)?j:[]).filter(x=>x.document).map(x=>{try{return JSON.parse(x.document.fields.j.stringValue)}catch(e){return {}}})}
+async function dedupeCopies(){if(S.dedupV1||!fbOn()||!S.branch||S.branch===HOME_BR)return;
+  const tok=await fbToken(),key=(c,r)=>c=='orders'?r.no+'|'+r.time:String(r.id),dels=[];let removed=0;
+  for(const c of SYNC_COLLS){const home=new Set((await fsQueryBr(c,HOME_BR,tok)).map(r=>key(c,r)));if(!home.size)continue;
+    S[c]=(S[c]||[]).filter(r=>{if(!home.has(key(c,r)))return true;removed++;if(r.br!==HOME_BR)dels.push({c,id:docId(c,r)});return false})}
+  dels.forEach(d=>{S.syncDel.push(d);delete S.syncH[d.c+'/'+d.id]});
+  S.dedupV1=Date.now();if(removed){logA('Removed copied data',removed+' records that belong to Silver Meats 2');toast('Cleaned '+removed+' copied records from the owner\'s laptop')}
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+async function fsGet(c,id){const tok=await fbToken(),r=await fetch(fsBase()+'/'+c+'/'+encodeURIComponent(id),{headers:{Authorization:'Bearer '+tok}});if(r.status==404)return null;const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||'read failed');const f=j.fields||{};let v=null;try{v=JSON.parse(f.j.stringValue)}catch(e){}return {t:+(f.t&&f.t.integerValue||0),v}}
+async function pullPrices(){if(!S.branch)return;const d=await fsGet('priceSet',S.branch);if(!d||!d.v||d.t<=(S.priceSetT||0))return;let n=0;
+  (d.v.ch||[]).forEach(c=>{const p=prod(c.id);if(!p)return;['price','wprice','cost'].forEach(f=>{if(f in c&&p[f]!==c[f]){p[f]=c[f];n++}})});
+  S.priceSetT=d.t;if(n){logA('Prices updated by owner',n+' price'+(n==1?'':'s')+' changed by '+(d.v.by||'owner'));toast('Prices were updated by the owner');if($('reg').classList.contains('on'))renderReg();if($('menu').classList.contains('on'))renderMenu()}
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* owner: edit another branch's prices from the laptop */
+var PB={br:'local',list:null,loadedT:0,err:''};
+function renderPbBar(){const show=fbOn()&&role(S.cashier)=='Owner';$('pbBar').style.display=show?'':'none';if(!show){PB.br='local';$('menuLocal').style.display='';$('pbWrap').style.display='none';return}
+  $('pbBar').innerHTML='<span class="note" style="margin-right:6px">Prices for:</span>'+[['local','This till ('+((BRANCHES.find(b=>b.id==S.branch)||{}).name||'')+')'],...BRANCHES.filter(b=>b.id!==S.branch).map(b=>[b.id,b.name+' – '+b.short]),['cmp','Compare branches']].map(([v,l])=>`<button class="chip" data-pb="${v}" aria-pressed="${PB.br==v}">${esc(l)}</button>`).join('');
+  $('menuLocal').style.display=PB.br=='local'?'':'none';$('pbWrap').style.display=PB.br=='local'?'none':''}
+async function loadPb(br){PB={br,list:null,loadedT:0,err:'',loading:true};renderPb();
+  try{if(br=='cmp'){const all={};for(const b of BRANCHES){if(b.id===S.branch){all[b.id]=S.products;continue}const d=await fsGet('products',b.id);all[b.id]=d&&d.v||[]}PB.cmp=all}
+    else{const d=await fsGet('products',br);PB.list=d&&d.v||[];PB.loadedT=d?d.t:0}}catch(e){PB.err=navigator.onLine===false?'No internet':String(e.message||e)}
+  PB.loading=false;if(PB.br===br)renderPb()}
+function renderPb(){const w=$('pbWrap'),b=BRANCHES.find(x=>x.id==PB.br);if(PB.br=='local'){w.innerHTML='';return}
+  if(PB.loading){w.innerHTML='<p class="note">⏳ Loading prices…</p>';return}if(PB.err){w.innerHTML=`<p class="note">⚠️ ${esc(PB.err)}</p>`;return}
+  if(PB.br=='cmp'){const ids=[...new Map([].concat(...BRANCHES.map(x=>PB.cmp[x.id]||[])).map(p=>[p.id,p])).values()];const pr=(bid,id,f)=>{const p=(PB.cmp[bid]||[]).find(x=>x.id==id);return p&&p[f]!=null?p[f]:null};
+    w.innerHTML=`<h3>Retail price in each branch (KSh)</h3><div class="scroll"><table><thead><tr><th>Product</th>${BRANCHES.map(x=>`<th class="n">${esc(x.name.replace('Silver Meats ','Branch '))}<br><span class="note">${esc(x.short)}</span></th>`).join('')}</tr></thead><tbody>${byCat(ids).map(p=>{const v=BRANCHES.map(x=>pr(x.id,p.id,'price'));const diff=new Set(v.filter(x=>x!=null)).size>1;return `<tr${diff?' style="background:#fff7e0"':''}><td>${esc(p.name)}</td>${v.map(x=>`<td class="n">${x==null?'—':ksh(x)}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><p class="note">Yellow rows have different prices between branches. A branch shows “—” until it has synced once.</p>`;return}
+  if(!PB.list.length){w.innerHTML=`<p class="note">${esc(b.name)} hasn't sent its product list yet. Open the till at that branch with internet once, then try again.</p>`;return}
+  w.innerHTML=`<h3>${esc(b.name)} – ${esc(b.short)}: prices</h3><p class="note">Change prices here, then tap <b>Send prices</b>. The branch till updates within about a minute while it has internet. Last list from the branch: ${PB.loadedT?new Date(PB.loadedT).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'}):'—'}.</p>
+  <div class="scroll"><table><thead><tr><th>Product</th><th>Sold by</th><th class="n">Buying KSh</th><th class="n">Retail KSh</th><th class="n">Wholesale KSh</th></tr></thead><tbody>${byCat(PB.list).map(p=>`<tr data-pid="${esc(p.id)}"><td>${esc(p.name)}</td><td>${p.unit=='kg'?'per kg':'per piece'}</td>${['cost','price','wprice'].map(f=>`<td class="n"><input data-pf="${f}" type="number" min="0" step="10" value="${p[f]??''}" placeholder="—" style="width:6.5em;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px"></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+  <div class="row" style="margin-top:12px"><button class="btn pay sm" id="pbSend" type="button">Send prices to ${esc(b.name)}</button><button class="btn" id="pbCopy" type="button">Copy prices from this till</button></div>`}
+$('pbBar').onclick=e=>{const v=e.target.dataset.pb;if(!v)return;PB.br=v;renderPbBar();if(v!='local')loadPb(v)};
+$('pbWrap').onclick=async e=>{
+  if(e.target.id=='pbCopy'){$('pbWrap').querySelectorAll('tr[data-pid]').forEach(tr=>{const p=prod(tr.dataset.pid);if(!p)return;tr.querySelectorAll('input[data-pf]').forEach(i=>{const v=p[i.dataset.pf];i.value=v??''})});toast('Copied. Check them, then tap Send prices.');return}
+  if(e.target.id!='pbSend')return;const b=BRANCHES.find(x=>x.id==PB.br),ch=[];
+  $('pbWrap').querySelectorAll('tr[data-pid]').forEach(tr=>{const old=PB.list.find(x=>x.id==tr.dataset.pid)||{},c={id:tr.dataset.pid};let any=false;
+    tr.querySelectorAll('input[data-pf]').forEach(i=>{const f=i.dataset.pf,raw=i.value.trim(),v=raw===''?null:Math.round(+raw);if(raw!==''&&isNaN(v))return;if(f=='price'&&v==null)return;if((old[f]??null)!==v){c[f]=v;any=true}});if(any)ch.push(c)});
+  if(!ch.length){toast('No prices changed');return}
+  e.target.disabled=true;try{const tok=await fbToken(),t=Date.now();const r=await fetch(fsBase()+':commit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({writes:[{update:{name:fsName('priceSet',b.id),fields:{br:{stringValue:b.id},t:{integerValue:String(t)},j:{stringValue:JSON.stringify({by:S.cashier,ch})}}}}]})});
+      if(!r.ok)throw new Error('Could not send ('+r.status+')');logA('Branch prices sent',b.name+': '+ch.length+' product'+(ch.length==1?'':'s'));save();
+      ch.forEach(c=>{const p=PB.list.find(x=>x.id==c.id);if(p)Object.assign(p,c)});toast(ch.length+' price change'+(ch.length==1?'':'s')+' sent to '+b.name)}
+  catch(err){toast(navigator.onLine===false?'No internet — try again later':String(err.message||err))}finally{e.target.disabled=false}};
 
 /* ---------- shell ---------- */
 function show(v){
