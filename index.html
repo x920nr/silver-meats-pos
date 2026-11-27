@@ -751,21 +751,22 @@ function receiptText(o){
   return [c((shopName(o)||'').toUpperCase()),...head(o).flatMap(h=>wrapT(h,w)).map(c),'-'.repeat(w),'Receipt #'+o.no,new Date(o.time).toLocaleString('en-KE'),...(o.cashier?['Served by '+o.cashier]:[]),...(o.mode=='wholesale'?['WHOLESALE SALE']:[]),...(o.customer&&o.method!='Credit'?['Customer: '+o.customer]:[]),'-'.repeat(w),
     ...o.items.flatMap(l=>[l.name.slice(0,w),row('  '+qtyTxt(l)+' x '+l.price,ksh(l.amt))]),'-'.repeat(w),row('Subtotal',ksh(o.sub)),
     ...(o.disc?[row('Discount '+o.discPct+'%','-'+ksh(o.disc))]:[]),...(o.tax?[row('VAT '+o.taxPct+'%',ksh(o.tax))]:[]),row('TOTAL',ksh(o.total)),
-    ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('Balance owed',ksh(balance(o.custId)))]:(o.method=='Split'?[row('Paid M-Pesa',ksh(o.split.mp)),row('Paid Cash',ksh(o.split.given))]:[row('Paid '+o.method,ksh(o.tendered||o.total))])),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
+    ...(o.method=='Credit'?[row('ON CREDIT (DENI)',ksh(o.total)),'Customer: '+(o.customer||''),row('BALANCE OWED',ksh(balance(o.custId)))]:(o.method=='Split'?[row('Paid M-Pesa',ksh(o.split.mp)),row('Paid Cash',ksh(o.split.given))]:[row('Paid '+o.method,ksh(o.tendered||o.total))])),...(o.change?[row('Change',ksh(o.change))]:[]),...(o.code?['M-Pesa ref '+o.code]:[]),
     ...(S.till?wrapT(mpLine(),w).map(c):[]),'',o.status=='Refunded'?c('*** REFUNDED ***'):c(S.footer||''),...(S.privRc?wrapT('Your details are used only for receipts and credit. Ask us to delete them.',w).map(c):[])].join('\n');
 }
 function openReceipt(o){
   lastOrder=o;
   $('rcPaper').innerHTML=`<img src="${LOGO}" alt="" style="display:block;width:140px;height:140px;margin:0 auto 6px"><h2>${esc(shopName(o))}</h2>${head(o).map(h=>`<div class="hd">${esc(h)}</div>`).join('')}<div class="sub" style="margin-top:8px">Receipt #${o.no} · ${new Date(o.time).toLocaleString('en-KE',{dateStyle:'medium',timeStyle:'short'})}${o.cashier?'<br>Served by '+esc(o.cashier):''}${o.mode=='wholesale'?'<br><b style="color:#c8102e">WHOLESALE SALE</b>':''}${o.customer&&o.method!='Credit'?'<br>Customer: <b>'+esc(o.customer)+'</b>':''}</div>`+
     linesHTML(o.items,false)+totHTML({sub:o.sub,d:o.disc,pct:o.discPct,t:o.tax,tp:o.taxPct,total:o.total})+
-    `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div><b>Balance owed</b><b>${ksh(balance(o.custId))}</b></div>`:(o.method=='Split'?`<div><span>Paid · M-Pesa</span><span>${ksh(o.split.mp)}</span></div><div><span>Paid · Cash</span><span>${ksh(o.split.given)}</span></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`)}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
+    `<div class="tot">${o.method=='Credit'?`<div><span>On credit (deni)</span><span>${ksh(o.total)}</span></div><div><span>Customer</span><span>${esc(o.customer||'')}</span></div><div style="font-size:1.15em;font-weight:800;border-top:2px solid #111;padding-top:4px;margin-top:2px"><b>BALANCE OWED</b><b>${ksh(balance(o.custId))}</b></div>`:(o.method=='Split'?`<div><span>Paid · M-Pesa</span><span>${ksh(o.split.mp)}</span></div><div><span>Paid · Cash</span><span>${ksh(o.split.given)}</span></div>`:`<div><span>Paid · ${o.method}</span><span>${ksh(o.tendered||o.total)}</span></div>`)}${o.change?`<div><span>Change</span><span>${ksh(o.change)}</span></div>`:''}${o.code?`<div><span>M-Pesa ref</span><span>${esc(o.code)}</span></div>`:''}</div>`+
     `${S.till?`<div class="hd" style="margin-top:10px">${esc(mpLine())}</div>`:''}<p style="text-align:center;margin:10px 0 0">${o.status=='Refunded'?'<b style="color:#b3261e">Refunded</b>':esc(S.footer)}</p>${S.privRc?'<p class="hd" style="margin-top:6px;font-size:11px">Your details are used only for receipts and credit. Ask us to delete them.</p>':''}`;
   $('rcPhone').value=o.custPhone||'';$('rcName').value=o.customer||'';$('rcName').disabled=o.method=='Credit';updWa();
   $('rcM').classList.add('on');
 }
 $('rcClose').onclick=()=>{$('rcM').classList.remove('on');if($('ord').classList.contains('on'))renderOrders()};
 $('rcCopy').onclick=()=>copy(receiptText(lastOrder),'Receipt copied');
-function waMsg(o){return '```\n'+receiptText(o)+'\n```'}
+function waMsg(o){const L=receiptText(o).split('\n'),i=L.findIndex(t=>/^BALANCE OWED/.test(t));if(i<0)return '```\n'+L.join('\n')+'\n```';
+  const a=L.slice(0,i).join('\n'),b=L.slice(i+1).join('\n');return '```\n'+a+'\n```\n*BALANCE OWED: '+ksh(balance(o.custId))+'*'+(b.trim()?'\n```\n'+b+'\n```':'')}
 function updWa(){if(lastOrder)$('rcWa').href=waTo($('rcPhone').value,waMsg(lastOrder))}
 $('rcPhone').oninput=updWa;
 $('rcName').onchange=()=>{if(!lastOrder||lastOrder.method=='Credit')return;const v=$('rcName').value.trim();if(v)lastOrder.customer=v;else delete lastOrder.customer;save();openReceipt(lastOrder);toast(v?'Name added to receipt':'Name removed');if($('ord').classList.contains('on'))renderOrders()};
@@ -777,7 +778,7 @@ async function receiptPic(o){
   x.font=F;const W=Math.ceil(x.measureText('M'.repeat(32)).width)+pad*2,L=190,H=pad+L+14+lines.length*lh+pad;
   cv.width=W*2;cv.height=H*2;x.scale(2,2);x.fillStyle='#fff';x.fillRect(0,0,W,H);
   const img=new Image();img.src=LOGO;try{await img.decode();x.drawImage(img,(W-L)/2,pad,L,L)}catch(e){}
-  lines.forEach((t,i)=>{const big=/^TOTAL/.test(t)||i==0;x.font=(big?'bold ':'')+F;x.fillStyle=/WHOLESALE|REFUNDED/.test(t)?'#c8102e':'#111';x.fillText(t,pad,pad+L+14+(i+0.8)*lh)});
+  lines.forEach((t,i)=>{const big=/^(TOTAL|BALANCE OWED)/.test(t)||i==0;x.font=(big?'bold ':'')+F;x.fillStyle=/WHOLESALE|REFUNDED|^BALANCE OWED/.test(t)?'#c8102e':'#111';x.fillText(t,pad,pad+L+14+(i+0.8)*lh)});
   x.fillStyle='#c8102e';x.fillRect(0,H-6,W,6);
   return cv;
 }
