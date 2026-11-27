@@ -552,7 +552,7 @@ const LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAQDAwQDAwQEA
 document.getElementById('hdrLogo').src=LOGO;
 {const l=document.createElement('link');l.rel='icon';l.href=LOGO;document.head.appendChild(l);const t=document.createElement('link');t.rel='apple-touch-icon';t.href=LOGO;document.head.appendChild(t)}
 const CATS=['Chicken','Beef','Goat','Camel','Fish','Other'];
-const byCat=a=>a.map((p,i)=>[p,i]).sort((x,y)=>(CATS.indexOf(x[0].cat)-CATS.indexOf(y[0].cat))||x[1]-y[1]).map(x=>x[0]);
+const catIx=c=>{const i=CATS.indexOf(c);return i<0?999:i},byCat=a=>a.map((p,i)=>[p,i]).sort((x,y)=>(catIx(x[0].cat)-catIx(y[0].cat))||x[1]-y[1]).map(x=>x[0]);
 const CC={Beef:'#c8102e',Chicken:'#111111',Goat:'#8e0b20',Camel:'#e0565f',Fish:'#555555',Other:'#999999'};
 const KEY='butchery-pos-v6';
 const $=id=>document.getElementById(id);
@@ -1067,7 +1067,7 @@ $('menuRows').onclick=e=>{if(e.target.dataset.si){openSi(e.target.dataset.si);re
   ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);logA('Product deleted',p.name);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
 $('addForm').onsubmit=e=>{e.preventDefault();
   const name=$('aName').value.trim(),price=parseFloat($('aPrice').value),st=$('aStock').value,wv=parseFloat($('aWprice').value),cv=parseFloat($('aCost').value);if(!name||isNaN(price))return;
-  S.products.push({id:'p'+Date.now(),name,cat:$('aCat').value,unit:$('aUnit').value,price:Math.round(price),wprice:wv>0?Math.round(wv):null,cost:cv>=0?Math.round(cv):null,stock:st===''?null:r3(+st)});save();renderMenu();
+  S.products.push({id:'p'+Date.now(),name,cat:$('aCat').value||'Other',unit:$('aUnit').value,price:Math.round(price),wprice:wv>0?Math.round(wv):null,cost:cv>=0?Math.round(cv):null,stock:st===''?null:r3(+st)});save();renderMenu();
   logA('Product added',name+' '+ksh(price));save();e.target.reset();$('aName').focus();toast(name+' added')};
 
 /* ---------- settings ---------- */
@@ -1098,7 +1098,7 @@ $('staffList').onclick=e=>{const d=e.target.dataset;
   const i=d.rmstaff;if(i==null)return;const n=S.staff[i];
   if(role(n)=='Owner'&&S.staff.filter(x=>role(x)=='Owner').length==1){toast('There must be at least one Owner');return}
   ask('Remove '+n+'?','Their past sales stay in your records.','Remove',()=>{S.staff.splice(i,1);delete S.roles[n];delete S.pins[n];logA('Staff removed',n);if(!S.staff.includes(S.cashier))S.cashier=S.staff[0];save();renderHead();renderStaff();applyAccess()})};
-$('bkCopy').onclick=()=>copy('SILVERPOS1:'+JSON.stringify(S),'Backup copied. Paste it into WhatsApp or email to keep it safe.');
+$('bkCopy').onclick=()=>copy('SILVERPOS1:'+JSON.stringify(Object.assign({},S,{fbAuth:null,syncH:{},syncDel:[]})),'Backup copied. Paste it into WhatsApp or email to keep it safe.');
 $('bkOpen').onclick=()=>{$('bkIn').value='';$('bkErr').textContent='';$('bkM').classList.add('on');$('bkIn').focus()};
 $('bkNo').onclick=()=>$('bkM').classList.remove('on');
 $('bkGo').onclick=()=>{
