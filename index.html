@@ -601,7 +601,7 @@ save();
 let cat='All',q='',method='Cash',undo=null,lastOrder=null,tt,wItem=null,wMode='kg',wEdit=-1,selDay=dk(Date.now()),cfFn=null,per='day';
 const prod=id=>S.products.find(p=>p.id==id);
 if(!S.mode)S.mode='retail';
-if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.supPays)S.supPays=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(!S.wastes)S.wastes=[];if(S.lockMin==null)S.lockMin=5;
+if(!S.customers)S.customers=[];if(!S.payments)S.payments=[];if(!S.expenses)S.expenses=[];if(!S.supPays)S.supPays=[];if(!S.log)S.log=[];if(!S.stockIns)S.stockIns=[];if(!S.wastes)S.wastes=[];S.products.forEach(p=>{if(p.img&&!p.imgT)p.imgT=Date.now()});if(S.lockMin==null)S.lockMin=5;
 const wp=p=>S.mode=='wholesale'&&p.wprice?p.wprice:p.price;
 const inCart=id=>S.cart.filter(l=>l.id==id).reduce((s,l)=>s+l.qty,0);
 function sums(items,disc,tax){
@@ -1069,7 +1069,7 @@ $('menuRows').oninput=e=>{
 $('menuRows').addEventListener('focusin',e=>{if(e.target.dataset.f)e.target.dataset.old=e.target.value});
 $('menuRows').addEventListener('change',e=>{const f=e.target.dataset.f;if(!f)return;const tr=e.target.closest('tr'),p=tr&&prod(tr.dataset.id);if(!p)return;const old=e.target.dataset.old??'',nv=e.target.value;if(old===nv)return;const L={name:'name',price:'retail price',wprice:'wholesale price',cost:'buying price',stock:'stock',cat:'category',unit:'sold by'};logA('Product changed',p.name+': '+L[f]+' '+(old||'—')+' → '+(nv||'—'));save();e.target.dataset.old=nv});
 $('menuRows').onclick=e=>{if(e.target.dataset.img){imgFor=e.target.dataset.img;$('imgFile').value='';$('imgFile').click();return}
-  if(e.target.dataset.imgdel){const p=prod(e.target.dataset.imgdel);if(p){delete p.img;logA('Photo removed',p.name);save();renderMenu();renderKeys()}return}
+  if(e.target.dataset.imgdel){const p=prod(e.target.dataset.imgdel);if(p){delete p.img;p.imgT=Date.now();logA('Photo removed',p.name);save();renderMenu();renderKeys()}return}
   if(e.target.dataset.si){openSi(e.target.dataset.si);return}const id=e.target.dataset.del;if(!id)return;const p=prod(id);
   ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);logA('Product deleted',p.name);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
 $('addForm').onsubmit=e=>{e.preventDefault();
@@ -1200,8 +1200,8 @@ let imgFor=null;
    const url=URL.createObjectURL(file),im=new Image();
    im.onload=()=>{const W=320,H=240,cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
      const sc=Math.max(W/im.naturalWidth,H/im.naturalHeight),dw=im.naturalWidth*sc,dh=im.naturalHeight*sc;x.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);URL.revokeObjectURL(url);
-     const old=p.img;p.img=cv.toDataURL('image/jpeg',0.72);
-     try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){if(old)p.img=old;else delete p.img;toast('Phone memory is full. Remove some photos first.');return}
+     const old=p.img,oldT=p.imgT;p.img=cv.toDataURL('image/jpeg',0.72);p.imgT=Date.now();
+     try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){if(old)p.img=old;else delete p.img;p.imgT=oldT;toast('Phone memory is full. Remove some photos first.');return}
      logA('Photo added',p.name);save();renderMenu();renderKeys();toast('Photo saved for '+p.name)};
    im.onerror=()=>{URL.revokeObjectURL(url);toast('That file is not a picture')};im.src=url}}
 
@@ -1336,10 +1336,12 @@ async function syncNow(manual){if(!fbOn()){if(manual)toast('Sign in to sync firs
   try{await dedupeCopies();let fixed=false;SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{if(!r.br){r.br=S.branch;fixed=true}}));S.orders.forEach(o=>{if(!o.id){o.id=(o.br||S.branch||'x')+'-'+o.no+'-'+o.time;fixed=true}});
     const writes=[],marks=[];
     {const pj=JSON.stringify(S.products.map(p=>({id:p.id,name:p.name,cat:p.cat,unit:p.unit,price:p.price,wprice:p.wprice||null,cost:p.cost??null}))),h=hashS(pj),k='products/'+S.branch;if(S.syncH[k]!==h){writes.push({update:{name:fsName('products',S.branch),fields:{br:{stringValue:S.branch},t:{integerValue:String(Date.now())},j:{stringValue:pj}}}});marks.push([k,h])}}
+    S.products.forEach(p=>{if(!p.imgT)return;const k=photoKey(p.name),h=hashS((p.img||'')+'|'+p.imgT),hk='photos/'+k;if(!k||S.syncH[hk]===h)return;
+      writes.push({update:{name:fsName('photos',k),fields:{br:{stringValue:S.branch},t:{integerValue:String(p.imgT)},n:{stringValue:p.name},img:{stringValue:p.img||''}}}});marks.push([hk,h])});
     SYNC_COLLS.forEach(c=>(S[c]||[]).forEach(r=>{const id=docId(c,r),j=JSON.stringify(r),h=hashS(j),k=c+'/'+id;if(S.syncH[k]===h)return;
       writes.push({update:{name:fsName(c,id),fields:{br:{stringValue:r.br||S.branch},t:{integerValue:String(r.time||0)},j:{stringValue:j}}}});marks.push([k,h])}));
     const dels=S.syncDel.slice();dels.forEach(d=>writes.push({delete:fsName(d.c,d.id)}));
-    await pullPrices();
+    await pullPrices();try{await pullPhotos()}catch(e){}
     if(!writes.length){S.syncAt=Date.now();S.syncErr='';if(fixed)try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};renderSyncDot();if(manual)toast('All synced');return}
     const tok=await fbToken();
     for(let i=0;i<writes.length;i+=300){const r=await fetch(fsBase()+':commit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({writes:writes.slice(i,i+300)})});
@@ -1409,6 +1411,18 @@ async function pullPrices(){if(!S.branch)return;const d=await fsGet('priceSet',S
   (d.v.ch||[]).forEach(c=>{const p=prod(c.id)||(c.name?S.products.find(x=>x.name.trim().toLowerCase()===c.name.trim().toLowerCase()):null);if(!p)return;['price','wprice','cost'].forEach(f=>{if(f in c&&p[f]!==c[f]){p[f]=c[f];n++}})});
   S.priceSetT=d.t;if(n){logA('Prices updated by owner',n+' price'+(n==1?'':'s')+' changed by '+(d.v.by||'owner'));toast('Prices were updated by the owner');if($('reg').classList.contains('on'))renderReg();if($('menu').classList.contains('on'))renderMenu()}
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* product photos shared between branches (matched by product name) */
+function photoKey(n){return (n||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,80)}
+async function pullPhotos(){if(!S.branch)return;const tok=await fbToken(),from=(S.photoT||0)+1;
+  const r=await fetch(fsBase()+':runQuery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:'photos'}],where:{compositeFilter:{op:'AND',filters:[{fieldFilter:{field:{fieldPath:'t'},op:'GREATER_THAN_OR_EQUAL',value:{integerValue:String(from)}}},{fieldFilter:{field:{fieldPath:'t'},op:'LESS_THAN',value:{integerValue:'9000000000000000'}}}]}}}})});
+  const j=await r.json();if(!r.ok)return;let n=0,maxT=S.photoT||0;
+  (Array.isArray(j)?j:[]).filter(x=>x.document).forEach(x=>{const f=x.document.fields||{},t=+((f.t||{}).integerValue||0),name=(f.n||{}).stringValue||'',img=(f.img||{}).stringValue||'';maxT=Math.max(maxT,t);
+    const k=photoKey(name),p=S.products.find(q=>photoKey(q.name)===k);if(!p||t<=(p.imgT||0))return;
+    if(img)p.img=img;else delete p.img;p.imgT=t;S.syncH['photos/'+k]=hashS((p.img||'')+'|'+t);n++});
+  S.photoT=maxT;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  if(n){logA('Photos updated',n+' product photo'+(n==1?'':'s')+' from another branch');renderKeys();if($('menu').classList.contains('on'))renderMenu()}}
 /* owner: edit another branch's prices from the laptop */
 var PB={br:'local',list:null,loadedT:0,err:''};
 function renderPbBar(){const show=fbOn()&&role(S.cashier)=='Owner';$('pbBar').style.display=show?'':'none';if(!show){PB.br='local';$('menuLocal').style.display='';$('pbWrap').style.display='none';return}
