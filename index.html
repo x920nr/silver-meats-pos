@@ -46,6 +46,11 @@ nav button[aria-current=true]{background:var(--brown);color:var(--band)}
 .key b{font-weight:700;font-size:16px;line-height:1.15;padding-right:28px}
 .key span{font-weight:700;font-size:15px}
 .key small{font-size:13px;opacity:.85}
+.key.has-img{padding:8px 10px 10px;justify-content:flex-start}
+.key .kimg{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:9px;background:#fff;margin-bottom:2px}
+.key.has-img i{top:14px;right:14px}
+.pthumb{width:46px;height:35px;object-fit:cover;border-radius:6px;display:block;margin-bottom:2px;border:1px solid #ddd}
+.photo-btn{font-size:12px;white-space:nowrap}
 .key small.low{opacity:1;background:#fff;color:var(--red);border-radius:6px;padding:0 6px;width:max-content;font-weight:700}
 .key i{position:absolute;top:8px;right:8px;font-style:normal;background:#fff;color:var(--brown);border:1.5px solid var(--brown);font-weight:800;font-size:13px;min-width:26px;height:26px;border-radius:13px;display:grid;place-items:center;padding:0 6px}
 .c-Beef{background:var(--brown);color:#fff}.c-Chicken{background:var(--sky);color:var(--brown);box-shadow:inset 0 0 0 1.5px #b9dbe4,inset 0 -4px 0 #b9dbe4}.c-Other{background:#8a7a72;color:#fff}
@@ -218,7 +223,7 @@ header{background:#fff;color:#111;border-bottom:4px solid #c8102e}header nav but
       <button class="btn pay sm" type="submit">Add</button>
     </form>
     <p class="note">Changes save as you type. <b>Buying price</b> is what you pay your supplier per kg or piece; it is used to work out your profit. Leave wholesale blank to use the retail price. Leave stock blank if you don't want to count it. Stock goes down with each sale and back up on a refund.</p>
-    <div class="scroll"><table><thead><tr><th>Product</th><th>Category</th><th>Sold by</th><th class="n">Buying KSh</th><th class="n">Retail KSh</th><th class="n">Wholesale KSh</th><th class="n">In stock</th><th></th></tr></thead><tbody id="menuRows"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Photo</th><th>Product</th><th>Category</th><th>Sold by</th><th class="n">Buying KSh</th><th class="n">Retail KSh</th><th class="n">Wholesale KSh</th><th class="n">In stock</th><th></th></tr></thead><tbody id="menuRows"></tbody></table></div>
     <h3 style="margin-top:26px" id="supTitle">Suppliers you owe (deni)</h3>
     <div class="scroll"><table><thead><tr><th>Supplier</th><th class="n">You owe</th><th>Last payment</th><th></th></tr></thead><tbody id="supRows"></tbody></table></div>
     <h3 style="margin-top:26px">Stock received</h3>
@@ -630,7 +635,7 @@ function renderKeys(){
   $('grid').innerHTML=list.length?list.map(p=>{
     const n=inCart(p.id);let st='';
     if(tracked(p)){const left=r3(p.stock-n),low=left<=(p.unit=='kg'?3:2);st=`<small class="${low?'low':''}">${left<=0?'Out of stock':(p.unit=='kg'?kg(left):left+' pc')+' left'}</small>`}
-    return `<button class="key c-${p.cat}" data-id="${p.id}"><b>${esc(p.name)}</b><span>${ksh(wp(p))}${p.unit=='kg'?' / kg':''}</span>${st}${n?`<i>${p.unit=='kg'?+n.toFixed(2):n}</i>`:''}</button>`}).join(''):'<p class="empty">Nothing matches. Add products on the Products tab.</p>';
+    return `<button class="key c-${p.cat}${p.img?' has-img':''}" data-id="${p.id}">${p.img?`<img class="kimg" src="${p.img}" alt="" loading="lazy">`:''}<b>${esc(p.name)}</b><span>${ksh(wp(p))}${p.unit=='kg'?' / kg':''}</span>${st}${n?`<i>${p.unit=='kg'?+n.toFixed(2):n}</i>`:''}</button>`}).join(''):'<p class="empty">Nothing matches. Add products on the Products tab.</p>';
 }
 function linesHTML(items,live){
   return items.map((l,i)=>`<div class="line"><span class="nm">${esc(l.name)}</span><span class="amt">${ksh(l.amt)}</span><span class="det">${qtyTxt(l)} × ${ksh(l.price)}${l.unit=='kg'?'/kg':''}</span>${live?`<div class="qty">${l.unit=='pc'?`<button data-dec="${i}" aria-label="One less">−</button><em>${l.qty}</em><button data-inc="${i}" aria-label="One more">+</button>`:`<button data-rew="${i}">Re-weigh</button>`}<button class="x" data-rm="${i}">Remove</button></div>`:''}</div>`).join('');
@@ -1047,7 +1052,7 @@ function renderMenu(){try{renderPbBar()}catch(e){}
   const opts=(list,v)=>list.map(x=>`<option value="${x[0]}"${x[0]==v?' selected':''}>${x[1]}</option>`).join('');
   const cats=CATS.map(c=>[c,c]),units=[['kg','per kg'],['pc','per piece']];
   $('aCat').innerHTML=opts(cats,'Beef');
-  $('menuRows').innerHTML=byCat(S.products).map(p=>`<tr data-id="${p.id}"><td><input id="nm-${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Name"></td><td><select id="ct-${p.id}" data-f="cat" aria-label="Category">${opts(cats,p.cat)}</select></td><td><select id="un-${p.id}" data-f="unit" aria-label="Sold by">${opts(units,p.unit)}</select></td><td class="n"><input id="co-${p.id}" data-f="cost" type="number" step="10" min="0" value="${p.cost??''}" placeholder="—" style="width:6.5em" aria-label="Buying price"></td><td class="n"><input id="pr-${p.id}" data-f="price" type="number" step="10" min="0" value="${p.price}" style="width:6.5em" aria-label="Retail price"></td><td class="n"><input id="wp-${p.id}" data-f="wprice" type="number" step="10" min="0" value="${p.wprice||''}" placeholder="${p.price}" style="width:6.5em" aria-label="Wholesale price"></td><td class="n"><input id="st-${p.id}" data-f="stock" type="number" step="0.5" value="${tracked(p)?p.stock:''}" placeholder="—" style="width:6em" aria-label="Stock"></td><td class="n" style="white-space:nowrap"><button class="link" data-si="${p.id}">Stock in</button><button class="link" data-del="${p.id}">Delete</button></td></tr>`).join('');
+  $('menuRows').innerHTML=byCat(S.products).map(p=>`<tr data-id="${p.id}"><td>${p.img?`<img class="pthumb" src="${p.img}" alt="Photo of ${esc(p.name)}"><button class="link photo-btn" data-img="${p.id}">Change</button> <button class="link photo-btn" data-imgdel="${p.id}">Remove</button>`:`<button class="link photo-btn" data-img="${p.id}">📷 Add photo</button>`}</td><td><input id="nm-${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Name"></td><td><select id="ct-${p.id}" data-f="cat" aria-label="Category">${opts(cats,p.cat)}</select></td><td><select id="un-${p.id}" data-f="unit" aria-label="Sold by">${opts(units,p.unit)}</select></td><td class="n"><input id="co-${p.id}" data-f="cost" type="number" step="10" min="0" value="${p.cost??''}" placeholder="—" style="width:6.5em" aria-label="Buying price"></td><td class="n"><input id="pr-${p.id}" data-f="price" type="number" step="10" min="0" value="${p.price}" style="width:6.5em" aria-label="Retail price"></td><td class="n"><input id="wp-${p.id}" data-f="wprice" type="number" step="10" min="0" value="${p.wprice||''}" placeholder="${p.price}" style="width:6.5em" aria-label="Wholesale price"></td><td class="n"><input id="st-${p.id}" data-f="stock" type="number" step="0.5" value="${tracked(p)?p.stock:''}" placeholder="—" style="width:6em" aria-label="Stock"></td><td class="n" style="white-space:nowrap"><button class="link" data-si="${p.id}">Stock in</button><button class="link" data-del="${p.id}">Delete</button></td></tr>`).join('');
   $('siRows').innerHTML=S.stockIns.slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td class="n">${ksh(x.total)}</td><td>${esc(x.supplier||'—')}</td><td>${x.from=='Credit'?(supOwed(x.supplier)>0?`<span class="tag ref">On credit</span> <button class="link" data-supay="${esc(x.supplier||'')}">Pay</button>`:'<span class="tag">Credit · paid</span>'):esc(x.from=='Cash'?'Drawer':x.from)}</td><td class="n"><button class="link" data-sidel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="7" class="note">No stock received yet. Tap <b>+ Stock in from supplier</b> when meat arrives.</td></tr>';
   $('wsRows').innerHTML=(S.wastes||[]).slice(-30).reverse().map(x=>`<tr><td style="white-space:nowrap">${new Date(x.time).toLocaleDateString('en-KE',{day:'numeric',month:'short'})}</td><td>${esc(x.name)}</td><td class="n">${x.unit=='kg'?kg(x.qty):x.qty+' pc'}</td><td>${esc(x.reason)}${x.note?' <span class="note">· '+esc(x.note)+'</span>':''}</td><td class="n">${x.value?ksh(x.value):'—'}</td><td class="n"><button class="link" data-wsdel="${x.id}">Undo</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">No waste recorded yet.</td></tr>';
   renderSup();
@@ -1063,7 +1068,9 @@ $('menuRows').oninput=e=>{
 };
 $('menuRows').addEventListener('focusin',e=>{if(e.target.dataset.f)e.target.dataset.old=e.target.value});
 $('menuRows').addEventListener('change',e=>{const f=e.target.dataset.f;if(!f)return;const tr=e.target.closest('tr'),p=tr&&prod(tr.dataset.id);if(!p)return;const old=e.target.dataset.old??'',nv=e.target.value;if(old===nv)return;const L={name:'name',price:'retail price',wprice:'wholesale price',cost:'buying price',stock:'stock',cat:'category',unit:'sold by'};logA('Product changed',p.name+': '+L[f]+' '+(old||'—')+' → '+(nv||'—'));save();e.target.dataset.old=nv});
-$('menuRows').onclick=e=>{if(e.target.dataset.si){openSi(e.target.dataset.si);return}const id=e.target.dataset.del;if(!id)return;const p=prod(id);
+$('menuRows').onclick=e=>{if(e.target.dataset.img){imgFor=e.target.dataset.img;$('imgFile').value='';$('imgFile').click();return}
+  if(e.target.dataset.imgdel){const p=prod(e.target.dataset.imgdel);if(p){delete p.img;logA('Photo removed',p.name);save();renderMenu();renderKeys()}return}
+  if(e.target.dataset.si){openSi(e.target.dataset.si);return}const id=e.target.dataset.del;if(!id)return;const p=prod(id);
   ask('Delete '+p.name+'?','It will be removed from the till. Past receipts keep it.','Delete',()=>{const i=S.products.indexOf(p);S.products.splice(i,1);logA('Product deleted',p.name);save();renderMenu();toast(p.name+' deleted',()=>{S.products.splice(i,0,p);save();renderMenu()})})};
 $('addForm').onsubmit=e=>{e.preventDefault();
   const name=$('aName').value.trim(),price=parseFloat($('aPrice').value),st=$('aStock').value,wv=parseFloat($('aWprice').value),cv=parseFloat($('aCost').value);if(!name||isNaN(price))return;
@@ -1185,6 +1192,18 @@ $('cnGo').onclick=()=>{let short=0,n=0,val=0;$('cnRows').querySelectorAll('tr[da
   toast(short?`Saved. ${short} product${short==1?'':'s'} short, worth ${ksh(val)}`:'Saved. No meat missing')};
 $('wsRows').onclick=e=>{const id=e.target.dataset.wsdel;if(!id)return;const x=S.wastes.find(y=>y.id==id);if(!x)return;
   ask('Undo this waste?',`${x.name} ${qf(x.qty,x.unit)} will be put back on stock.`,'Undo',()=>{const p=prod(x.prodId);if(p&&tracked(p))p.stock=r3(p.stock+x.qty);S.wastes=S.wastes.filter(y=>y!==x);syncDelete('wastes',x);logA('Waste undone',x.name+' '+qf(x.qty,x.unit));save();renderMenu()})};
+
+/* ---------- product photos ---------- */
+let imgFor=null;
+{const f=document.createElement('input');f.type='file';f.accept='image/*';f.id='imgFile';f.style.display='none';document.body.appendChild(f);
+ f.onchange=()=>{const file=f.files&&f.files[0],p=prod(imgFor);if(!file||!p)return;
+   const url=URL.createObjectURL(file),im=new Image();
+   im.onload=()=>{const W=320,H=240,cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
+     const sc=Math.max(W/im.naturalWidth,H/im.naturalHeight),dw=im.naturalWidth*sc,dh=im.naturalHeight*sc;x.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);URL.revokeObjectURL(url);
+     const old=p.img;p.img=cv.toDataURL('image/jpeg',0.72);
+     try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){if(old)p.img=old;else delete p.img;toast('Phone memory is full. Remove some photos first.');return}
+     logA('Photo added',p.name);save();renderMenu();renderKeys();toast('Photo saved for '+p.name)};
+   im.onerror=()=>{URL.revokeObjectURL(url);toast('That file is not a picture')};im.src=url}}
 
 /* ---------- auto-lock ---------- */
 var lastAct=Date.now();['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},true));
